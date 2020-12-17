@@ -1,0 +1,27 @@
+---
+title: "03-research-guidelines"
+output: pdf_document
+---
+
+# Research Guidelines {#research-guidelines}
+
+After surveying the related literature in the context of the MDRP, there are multiple solutions focused on solving the routing problems with varying degrees of complexity.
+Understanding the problem is essential, and although all works have made a thorough effort in providing novel models and algorithms that solve the dynamic routing problem, these tend to focus on the model itself.
+Businesses do not thrive as a consequence of applying the best or most complex algorithm.
+On the contrary, companies succeed by understanding the operation and industry they belong to.
+This leads to the opportunity and challenge of developing a holistic testing environment where the problem can be framed and analyzed, as well as providing a means to evaluate solution strategies.
+Testing and measuring solutions is *as* important as their development, thus the following objective guides this research:
+
+- Develop a computational framework where solutions for the Meal Delivery Routing Problem can be tested and gaps from the existing literature regarding operational dynamics are closed.
+
+To achieve this objective, the following secondary objectives are stated:
+
+1. Define operational dynamics missing from the existing MDRP literature.
+1. Develop a discrete events simulator to represent the operation in which the MDRP functions.
+1. Prepare real-life data instances to test solutions and feed the simulator.
+1. Develop policies for matching orders to couriers.
+1. Develop policies to capture the movement mechanics of couriers in the city.
+1. Develop policies that model the acceptance or rejection of notifications by couriers.
+1. Develop policies for modeling how orders are canceled by actors.
+1. Design a computational framework where policies can be easily interchanged and operates with the simulator at its core.
+1. Test different solution policies over a variety of scenarios using the proposed framework to obtain simulated performance metrics for policies comparison.

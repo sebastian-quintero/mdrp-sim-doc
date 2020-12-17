@@ -1,0 +1,23 @@
+---
+title: "08-LINPACK"
+output: pdf_document
+---
+
+# LINPACK Benchmark {#linpack-benchmark}
+
+This Appendix contains the steps necessary to benchmark an **Intel-based** CPU.
+
+1. Go to the [Intel® Math Kernel Library (Intel® MKL) Benchmarks Suite](https://software.intel.com/content/www/us/en/develop/articles/intel-mkl-benchmarks-suite.html).
+1. Download the latest package that is appropriate for the operating system (for this research, a macOS was used).
+1. Unzip the file.
+1. Go to this dir (mac version for 2020 is shown): `./benchmarks_2020/mac/mkl/benchmarks/linpack`
+1. Double click the `linpack_cd64` (or appropriate file) Unix executable.
+1. A terminal/command prompt pops up, press Enter.
+1. For the `Number of equations to solve` enter 5000 (or a large enough number).
+1. For the `Leading dimensions for array` enter 10000 (or a large enough number).
+1. For the `Number of trials to run` enter 200 (or a similar number).
+1. For the `Data alignment value (in Kbytes)`, which is the memory reservation to use, enter 1000000 (or the desired memory allocation).
+1. The program starts running and showing benchmarks.
+1. When finished, use the `Average` GFlops result reported as the benchmark.
+
+\newpage

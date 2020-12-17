@@ -1,0 +1,69 @@
+---
+title: "02-literature-review"
+output: pdf_document
+---
+
+# Literature Review {#literature-review}
+
+This research focuses on the Meal Delivery Routing Problem, which is a class of Dynamic Vehicle Routing Problem (DVRP) that incorporates pickups and deliveries, belonging to the Dynamic Pickup and Delivery Problems (DPDP).
+Given the nature and urgency of the context of the problem, it is closely associated with the Same Day Delivery Problem (SDDP) and the Dial-A-Ride Problem (DARP), in which customers are transported, rather than goods.
+A survey over these problems is conducted to study the state of the art pertaining the MDRP.
+
+## Dynamic Vehicle Routing and Pickup & Delivery Problems
+@dvrp_survey provide a comprehensive survey of the DVRP.
+Problems are classified under the taxonomy of information evolution and quality, classifying problems into: static-deterministic, static-stochastic, dynamic-deterministic or dynamic-stochastic.
+In this line, @event_driven_optimization propose an event-driven framework to optimize the DVRP, applying multi-core and multi-threaded parallelism.
+The framework is used for a problem with stochastic information, where customer demands are random variables.
+@dvrp_three_decades also compile a review on the literature of the DVRP and classify different publications by these problem features: type of problem (as pointed by @dvrp_survey), logistical context (pickup & deliveries), transportation mode (road, maritime, air, etc...), objective function (min cost, min distance, min travel time, etc...), fleet size (single, limited number, large size), time constraints (hard, soft, unclear, no), vehicle capacity constraints (yes or no), ability to reject customers (yes or no), nature of dynamic element (requests, travel / service time, vehicle availability), nature of stochasticity (location, demand, time or no) and solution methods (Tabu search, neighborhoods search, insertion, dynamic programming, Markov decision process, other).
+
+An earlier review of the DPDP was done by @dpdp_survey.
+Solution strategies and algorithmic performance assessment is discussed.
+An application for transporting handicapped people is presented but nowadays there exists a variety of applications, specially in the on-demand delivery spectrum.
+@waiting_strategies explore four waiting strategies for a DPDP with time windows: drive-first, wait-first, dynamic waiting and advanced dynamic waiting.
+These waiting strategies reference the scheduling of drivers when deciding at what moment they should depart for the next location.
+@dynamic_pricing_matching present a dynamic waiting model, in which dynamic pricing helps solve a ride-hailing problem.
+In this environment, data from the company Uber is studied, an operation governed by the DPDP.
+
+## Same Day Delivery and Dial A Ride Problems
+The SDDP was introduced by @same_day_delivery.
+To solve the SDDP, a Markov decision process is presented.
+Future information is incorporated in the route planning to account for the highly dynamic nature of the problem.
+A key difference between the SDDP and DPDP is that in the SDDP, vehicles must always return to the depot (single pickup location).
+Related to the SDDP, @dynamic_waves formulate the Dynamic Dispatch Waves Problem (DDWP).
+There is a depot where orders arrive dynamically and must be delivered on the same day.
+Decisions are made by waves (moments in time), where vehicles can be dispatched or held back.
+Information incorporated in the solution is deterministic.
+
+In this context, @wgc explain the Wild Goose Chase (WGC) phenomenon, in which drivers follow the demand of rides in a ride-hailing operation and during demand spikes, service quality is extremely affected.
+A surge-pricing model is introduced where the ride's price is dynamically adjusted based on the demand of a geographical zone.
+This has become industry standard for ride-hailing services.
+The problem of transporting on-demand passengers is known as the Dial-A-Ride Problem (DARP).
+A survey on DARP literature is done by @darp.
+Once again, a common example for transporting elderly or disabled people is mentioned, but with the rise of ride-hailing platforms, there are now a great variety of realizations of the DARP.
+
+## Meal Delivery Problems
+The former problems lead to the current challenge of delivering meals by on-line services.
+@mdrp formally introduce the Meal Delivery Routing Problem and is the foundation of this research.
+They provide a myopic rolling horizon approach to solving the problem, first obtaining routes and then matching them to couriers.
+Instances are artificially created relying on euclidean distances and a simplified coordinate system from a reference point, with sizes ranging to the hundreds of orders.
+@meal_delivery_problem introduce the Restaurant Meal Delivery Problem (RMDP).
+The problem is very similar to the MDRP but varies in that for the RMDP, the time it takes to cook an order is stochastic.
+To solve the RMDP, a cost function approximation is proposed based on a route-based Markov decision process model.
+
+@provably follow the MDRP and create an exact solution with a column-generation approach.
+However, this solution assumes a clairvoyant dispatcher with perfect information, which is an unlikely scenario to encounter in production.
+This solution can be used for shorter decision periods for scheduled orders, although this feature is not considered in the MDRP.
+@dynamic_courier_routing define the Virtual Food Court Delivery Problem (VFCDP), in which multiple restaurants may be included in a single customer's order.
+An MIP formulation is provided to solve this problem in conjunction with an auction-based heuristic to handle proactive decisions that incorporate the future demand.
+@dynamic_courier_routing show that incorporating look-ahead policies outperforms a purely myopic solution approach.
+Instances provided are artificially created based on probability distributions and correspond to a small operation.
+
+@drones presents an MIP model for delivering meals with a fleet of drones, as opposed to using humans.
+This model allows for the advantage of avoiding traffic conditions and uncertainty in the behavior of couriers, whereas the performance of these drones is highly limited and charging cycles are part of important decision variables.
+@green_meal introduce the Green Meal Delivery Routing Problem (GMDRP) where one of the objectives is to minimize the carbon footprint of the solution.
+It uses a genetic algorithm, principal component analysis and clustering to find initial delivery routing and further optimization is done with Adaptive Neighborhood Search.
+It is a class of Multi-Objective VRP.
+@supervised dwell in the MDRP but focus on the aspect of predicting arrival times for customers.
+Both an offline and online approach is conducted over a computational study that shows how proper predictions improve the performance of the system.
+
+

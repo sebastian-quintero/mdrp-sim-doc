@@ -1,0 +1,37 @@
+---
+title: "06-conclusions"
+output: pdf_document
+---
+
+\newpage
+
+# Conclusions {#conclusions}
+
+A flexible computational framework for solving the Meal Delivery Routing Problem is introduced.
+The framework leverages on interchangeable policies to test out models and algorithms that solve different challenges of the MDRP.
+It is designed to easily load real-life instances, simulate and output performance metrics for comparison.
+The framework can be easily plugged in to any data source and leverages the use of external services for tasks such as optimization and city routing.
+The proposed instances allow for a variety of operational configurations where hypotheses and solutions may be tested.
+In addition, new definitions are given and formalized in the MDRP to resemble a real operation.
+
+Computational experiments were conducted using the framework over 36 scenarios, comparing two operational conditions and five *matching* policies.
+It is shown that for both less realistic (couriers who stay still and accept any notification) and realistic (couriers move about the city and decide whether to accept a notification) operations, the `modified-mdrp` or `mdrp-graph-prospects` policies perform the best since click-to-door, in-store to pick-up, drop-off lateness, click to taken and ready to pick-up times are minimized  and have a more adjusted distribution.
+The `greedy` has the best overall fulfillment rate but with sub-optimal quality regarding times.
+This situation resembles a life-like business problem: different models optimize separate metrics and thus a decision must be made over which metric has priority.
+When dissecting the performance of the `mdrp` policy in the realistic operation setting, the model under-performs when the service quality is more stringent and the system is less tolerant to delays.
+
+The novel definitions allow for an abstraction of the meal delivery problem into a more generalized On-Demand Delivery Routing Problem.
+Given that an order has a placement, preparation and ready times and there are service times associated to the store and the user, the problem can be easily transformed into a Groceries Delivery Routing Problem.
+Orders may be scheduled well ahead of time, in which case the placement time is much less than the preparation time.
+Routing passengers for the Dial-A-Ride Problem can also be abstracted using these definitions.
+An order (ride) has a pick-up location (the user's location), a drop-off location (the desired destination), a placement time (now), a preparation time (now or scheduled), a ready time (the same as the preparation time) and service times (which are zero at both locations).
+The problem is the same: finding a set of routes that optimize some performance metric by matching couriers (drivers) to orders (riders).
+It can be seen that many on-demand problems may be abstracted to a single definition.
+
+Given that the foundational work for representing the operation has been done, further research can focus on developing new policies.
+The policies showcased in this research are fairly simple and have a myopic approach.
+New work with look-ahead policies can be done to proactively preposition couriers about the city, based on estimations of the demand.
+*Cancellation* policies can be modified to incorporate the variability in preparation times and develop robust models where an order can be canceled before starting the preparation if no courier is estimated to be available for matching.
+Additionally, different routing approaches can be compared while also considering assignment updates.
+A single cost function was used to produce the matches, but different metrics can be optimized to compare outcomes.
+Lastly, a more robust definition can be given to the simulator, by defining new actors such as the restaurant and real-life decisions that impact the operation.

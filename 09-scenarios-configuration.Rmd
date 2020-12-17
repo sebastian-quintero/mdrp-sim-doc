@@ -1,0 +1,105 @@
+---
+title: "08-scenarios-configuration"
+output: pdf_document
+---
+
+# Complete Scenarios Description {#scenarios-description}
+
+The following policies are used across all scenarios:
+
+- User *cancellation* policy ($\mathbb{P}_{uc}$) $\implies \mathbb{P}'_{uc}[\text{random}]$
+- Dispatcher *cancellation* policy ($\mathbb{P}_{dc}$) $\implies \mathbb{P}'_{dc}[\text{static}]$
+- Dispatcher *buffering* policy ($\mathbb{P}_{b}$) $\implies \mathbb{P}'_{b}[\text{rolling-horizon}]$
+- Dispatcher *prepositioning evaluation* policy ($\mathbb{P}_{pe}$) $\implies \mathbb{P}'_{pe}[\text{fixed}]$
+- Dispatcher *prepositioning* policy ($\mathbb{P}_{dp}$) $\implies \mathbb{P}'_{dp}[\text{naive}]$
+- Courier *movement* policy ($\mathbb{P}_{mp}$) $\implies \mathbb{P}'_{mp}[\text{osrm}]$
+
+The following values are used across all scenarios:
+
+- Courier acceptance rate ($p_c$) = $U(0.4, 1)$
+- Courier movement probability = $0.4$
+- Courier wait to move ($f_r$) = $45$ minutes
+- Courier earnings per order ($p_1$) = $3$
+- Courier earnings per hour ($p_2$) = $8$
+
+- Dispatcher rolling horizon time ($f$) = $2$ minutes
+- Dispatcher prepositioning time ($f_p$) = $1$ hour
+- Dispatcher prospects maximum distance ($d$) = $3$ km
+- Dispatcher maximum orders per route ($S_{max}$) = $3$
+- Dispatcher prospects maximum off-set ($\beta$) = $10$ minutes
+- Dispatcher prospects maximum ready time (part of the commitment strategy) = $4$ minutes
+- Dispatcher maximum ready time slack ($\Delta_1$) = $10$ minutes
+- Dispatcher delay penalty ($\theta$) = $0.4$
+
+- User cancellation probability ($x_u$) = $0.75$
+- User service time ($s^u$) = $U(2, 5)$ minutes
+- Restaurant service time ($s^r$) = $U(2, 10)$ minutes
+- Order target drop-off time ($\tau$) = $40$ minutes
+
+All configurations can be modified in the [`settings.py`](https://github.com/sebastian-quintero/mdrp-sim/blob/master/settings.py) file of the repository [@mdrp_sim].
+
+Scenarios are configured based on the different instances.
+In addition, the simulation's *start time* (ST), *end time* (ET), *create users from* (CUF), *create users until* (CUU), *create couriers from* (CCF), *create couriers until* (CCU) and *warm-up time* (W - in seconds) are varied.
+The other two variations among scenarios are the dispatcher's cancellation time ($t^d$, in minutes) and the user's cancellation time ($t^u$, in minutes).
+The simulation scenarios are listed in Table \@ref(tab:scenarios-configuration) based on different configurations of these 10 variations.
+In Table \@ref(tab:scenarios-configuration), there are different groups of scenarios:
+
+1. *1 - 12*. Scenarios over the large instances, with a limited fleet, small window of order creation and a strict cancellation behavior (both the dispatcher and the user don't want to wait before deciding to cancel).
+1. *13 - 20*. Scenarios over the small instances, with a large fleet, a whole day of order creation and a strict cancellation behavior.
+1. *21 - 28*. Scenarios over the small instances, with a medium fleet, order creation based on the valley hours and a tolerant cancellation behavior (the dispatcher and user wait more time before deciding to cancel).
+1. *29 - 32*. Scenarios over the medium instances, with a limited fleet, order creation based on the valley hours and a tolerant cancellation behavior.
+1. *33 - 36*. Scenarios over the medium instances, with a limited fleet, small window of order creation based on the nightly peak hours and a permissive cancellation behavior.
+
+\begin{table}[h!]
+  \begin{center}
+    \caption{Configuration of scenarios}
+    \label{tab:scenarios-configuration}
+    \begin{tabular}{cclllllllll}
+      \hline
+      \textbf{Scenario} & \textbf{Instance} & \textbf{ST} & \textbf{ET} & \textbf{CUF} & \textbf{CUU} & \textbf{CCF} & \textbf{CCU} & \textbf{W} &
+      \textbf{$t^d$} & \textbf{$t^u$} \\
+      \hline
+      1 & 0 & 10:00 & 18:00 & 16:00 & 16:05 & 10:00 & 10:10 & 18 000 & 25 & 15 \\
+      2 & 1 & 10:00 & 18:00 & 16:00 & 16:05 & 10:00 & 10:10 & 18 000 & 25 & 15 \\
+      3 & 2 & 10:00 & 18:00 & 16:00 & 16:05 & 10:00 & 10:10 & 18 000 & 25 & 15 \\
+      4 & 6 & 10:00 & 18:00 & 16:00 & 16:05 & 10:00 & 10:10 & 18 000 & 25 & 15 \\
+      5 & 7 & 10:00 & 18:00 & 16:00 & 16:05 & 10:00 & 10:10 & 18 000 & 25 & 15 \\
+      6 & 8 & 10:00 & 18:00 & 16:00 & 16:05 & 10:00 & 10:10 & 18 000 & 25 & 15 \\
+      7 & 12 & 10:00 & 18:00 & 16:00 & 16:05 & 10:00 & 10:10 & 18 000 & 25 & 15 \\
+      8 & 13 & 10:00 & 18:00 & 16:00 & 16:05 & 10:00 & 10:10 & 18 000 & 25 & 15 \\
+      9 & 14 & 10:00 & 18:00 & 16:00 & 16:05 & 10:00 & 10:10 & 18 000 & 25 & 15 \\
+      10 & 18 & 10:00 & 18:00 & 16:00 & 16:05 & 10:00 & 10:10 & 18 000 & 25 & 15 \\
+      11 & 19 & 10:00 & 18:00 & 16:00 & 16:05 & 10:00 & 10:10 & 18 000 & 25 & 15 \\
+      12 & 20 & 10:00 & 18:00 & 16:00 & 16:05 & 10:00 & 10:10 & 18 000 & 25 & 15 \\
+      \hline
+      13 & 3 & 00:00 & 23:59 & 00:00 & 22:00 & 00:00 & 06:00 & 10 800 & 25 & 15 \\
+      14 & 4 & 00:00 & 23:59 & 00:00 & 22:00 & 00:00 & 06:00 & 10 800 & 25 & 15 \\
+      15 & 9 & 00:00 & 23:59 & 00:00 & 22:00 & 00:00 & 06:00 & 10 800 & 25 & 15 \\
+      16 & 10 & 00:00 & 23:59 & 00:00 & 22:00 & 00:00 & 06:00 & 10 800 & 25 & 15 \\
+      17 & 15 & 00:00 & 23:59 & 00:00 & 22:00 & 00:00 & 06:00 & 10 800 & 25 & 15 \\
+      18 & 16 & 00:00 & 23:59 & 00:00 & 22:00 & 00:00 & 06:00 & 10 800 & 25 & 15 \\
+      19 & 21 & 00:00 & 23:59 & 00:00 & 22:00 & 00:00 & 06:00 & 10 800 & 25 & 15 \\
+      20 & 22 & 00:00 & 23:59 & 00:00 & 22:00 & 00:00 & 06:00 & 10 800 & 25 & 15 \\
+      \hline
+      21 & 3 & 07:00 & 12:00 & 07:00 & 11:00 & 07:00 & 09:00 & 3 600 & 60 & 45 \\
+      22 & 4 & 07:00 & 12:00 & 07:00 & 11:00 & 07:00 & 09:00 & 3 600 & 60 & 45 \\
+      23 & 9 & 07:00 & 12:00 & 07:00 & 11:00 & 07:00 & 09:00 & 3 600 & 60 & 45 \\
+      24 & 10 & 07:00 & 12:00 & 07:00 & 11:00 & 07:00 & 09:00 & 3 600 & 60 & 45 \\
+      25 & 15 & 07:00 & 12:00 & 07:00 & 11:00 & 07:00 & 09:00 & 3 600 & 60 & 45 \\
+      26 & 16 & 07:00 & 12:00 & 07:00 & 11:00 & 07:00 & 09:00 & 3 600 & 60 & 45 \\
+      27 & 21 & 07:00 & 12:00 & 07:00 & 11:00 & 07:00 & 09:00 & 3 600 & 60 & 45 \\
+      28 & 23 & 07:00 & 12:00 & 07:00 & 11:00 & 07:00 & 09:00 & 3 600 & 60 & 45 \\
+      \hline
+      29 & 5 & 00:00 & 10:00 & 00:00 & 08:00 & 00:00 & 00:10 & 8 400 & 60 & 45 \\
+      30 & 11 & 00:00 & 10:00 & 00:00 & 08:00 & 00:00 & 00:10 & 8 400 & 60 & 45 \\
+      31 & 17 & 00:00 & 10:00 & 00:00 & 08:00 & 00:00 & 00:10 & 8 400 & 60 & 45 \\
+      32 & 22 & 00:00 & 10:00 & 00:00 & 08:00 & 00:00 & 00:10 & 8 400 & 60 & 45 \\
+      \hline
+      33 & 5 & 08:00 & 21:00 & 19:00 & 19:05 & 08:00 & 08:30 & 18 000 & 50 & 30 \\
+      34 & 11 & 08:00 & 21:00 & 19:00 & 19:05 & 08:00 & 08:30 & 18 000 & 50 & 30 \\
+      35 & 17 & 08:00 & 21:00 & 19:00 & 19:05 & 08:00 & 08:30 & 18 000 & 50 & 30 \\
+      36 & 22 & 08:00 & 21:00 & 19:00 & 19:05 & 08:00 & 08:30 & 18 000 & 50 & 30 \\
+      \hline
+    \end{tabular}
+  \end{center}
+\end{table}

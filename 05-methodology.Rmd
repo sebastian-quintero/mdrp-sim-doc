@@ -1,0 +1,716 @@
+---
+output:
+  pdf_document: default
+header-includes:
+  - \usepackage[ruled,vlined,linesnumbered]{algorithm2e}
+---
+# Methodology {#methodology}
+
+## Computational Framework {#computational_framework}
+
+The computational framework to solve the MDRP is an integrated software solution that consists of three modules:
+
+1. *World Mock*. 
+This module of the framework is the interface that brings new data to the system.
+Real-life instances are loaded here and new data is obtained: users and couriers logging on to the system.
+The Internal clock advances time.
+1. *Reality Simulation*.
+This module contains the discrete events simulator.
+All the subtleties of how different actors interact with one another happen here.
+This module saves the performance metrics of the solution.
+Policies for the simulator are loaded in this module.
+1. *Services*. 
+Services that provide functionality to the simulation.
+Services are self contained and are characterized by receiving an input and generating an output, without other dependencies.
+
+The computational framework is designed to test out solutions for the MDRP.
+It also has a full unit test suite in place to provide support when shipping new code.
+The framework simulates the execution of the solution and outputs performance metrics, representing a real-life operation.
+Keeping this in mind, potential users can focus on implementing models and algorithms (create policies), using the computational framework to compare results, without having to worry about the nuance of finding a way to apply their solution.
+
+Figure \@ref(fig:computational-framework) showcases how the computational framework is built. 
+The framework is built on top of [Python](https://www.python.org/)[@python]. 
+The *World* module advances the internal clock. 
+For each time stamp generated, it queries a [PostgreSQL](https://www.postgresql.org/)[@postgresql] data base (DDBB) that is mounted via a [Docker](https://www.docker.com/)[@docker] container. 
+The DDBB contains the data instances where it is known when a user or courier logs on to the system and their respective properties, including the order associated to the user. 
+If there is new information to be retrieved, the query returns the users and/or couriers. 
+This data is pushed to the *Simulator* module
+
+The *Simulator* module is built on top of [SimPy](https://simpy.readthedocs.io/en/latest/index.html)[@simpy].
+This simulator recreates the entire logic described in the [**problem description**](#problem-description).
+After a simulation is completed, the results and output are written to the local *PostgreSQL* DDBB via *Docker*.
+The simulator uses policies to help actors execute actions or make decisions.
+These policies are modularized and conceived as building blocks: easily interchangeable and flexible for testing different models and algorithms in the framework.
+The policies are the units that make use of the services available inside the computational framework.
+Currently, the *Simulator* makes use of two services: the *Optimizer* and a *OSRM* ([Open Source Routing Machine](http://project-osrm.org/))[@osrm] container.
+
+The *Optimizer* service provides an interface to solve mathematical optimization models with [COIN-OR](https://www.coin-or.org/)[@coin_or] or [Gurobi](https://www.gurobi.com/)[@gurobi]. 
+The *OSRM* service is mounted via *Docker* and receives requests. 
+A request contains an origin, a destination and a vehicle.
+Each location is characterized by a $(lat, lng)$ tuple. 
+The service returns the city travel time it takes to go from that origin to that destination, using the vehicle provided in the request.
+
+```{r computational-framework, fig.cap='Computational framework built around three modules.', out.width='100%', fig.align='center', echo=FALSE}
+knitr::include_graphics(path = './_figures/computational_framework.pdf', auto_pdf = TRUE)
+```
+
+The code base for the computational framework can be found in the [mdrp-sim Github repository](https://github.com/sebastian-quintero/mdrp-sim)[@mdrp_sim].
+The reader is encouraged to visit the repository and follow the README to execute a simulation.
+Having explained what the computational framework is, this chapter further explains the design of the simulator and policies used therein.
+
+## Discrete Events Simulator for the MDRP {#simulator}
+
+The simulator accurately and robustly represents an operation governed by the [**problem description**](#problem-description). These are the components of the simulator:
+
+- *Event*. 
+A sequence of items, facts, actions or changes triggered at a moment in time that follow a chronological order.
+- *Actor*. 
+Entity that makes decisions and executes actions (triggers events).
+- *State*. 
+Current condition of an actor. 
+Can also be defined as a sequence of events during a specific time interval pertaining to an actor.
+- *Policy*. 
+Algorithms, models, logic and general conditions that structure how an actor makes a decision or executes an action.
+- *Object*. 
+Passive entity used to represent an abstract object, person or place. Does not make decisions or execute actions.
+
+The simulator has a *start time* and *end time*. 
+Although the available instances in this research are made up of a complete day (0 h - 23:59 h), a simulation can be performed over any partial time window. 
+Moreover, the simulator has a *warm-up time* to achieve steady state and any events generated during the warm-up period are discarded.
+To provide flexibility for the simulation time window, there are constants that allow the handling of new entities entering the system: *create users from*, *create users until*, *create couriers from* and *create couriers until* times.
+These times can serve to provide a cool-down period to depart from the steady state.
+
+The objects of the simulator are:
+
+- *Order*. 
+The main object of the simulation.
+It is a placeholder that registers events, as it is passed between the actors.
+It contains the attributes described in the [**MDRP**](#the_meal_delivery_routing_problem) and [**novel characteristics**](#novel_characteristics) sections.
+- *Location*.
+Physical place represented by a $(lat, lng)$ tuple.
+- *Notification*.
+Structure that relates a courier to an instruction that needs to be carried out.
+- *Stop*.
+Object characterized by having a location and time that may contain orders to be picked up or dropped off.
+- *Route*.
+An ordered set of stops that may contain orders to be delivered.
+- *Vehicle*.
+Transportation mode of a courier.
+
+There are three actors in the simulator:
+
+1. *User*.
+A user $u \in U$ who orders meals.
+1. *Courier*.
+A courier $c \in C$ who delivers meals.
+1. *Dispatcher*.
+The system controller. 
+It may also be referred to as "the company".
+This actor is responsible for the operation and for fulfilling orders.
+It orchestrates the communication between the user and the courier.
+
+The restaurant is not modeled as an actor as no decisions are made from their part.
+It is assumed that all placed orders are cooked and the ready time is always fulfilled.
+However, the restaurant may be represented as an actor in future research where decisions, such as if an order is accepted, or the time it takes to prepare a meal, are taken.
+
+In the following sections, the events, states and policies of each actor are described.
+Given that the policies contain the more complex logic and algorithms, all the available policies are separately described afterwards.
+
+### User {#user}
+
+Figure \@ref(fig:user) contains the state transition diagram for the user.
+Since a user is linked to a single order and viceversa, we may refer to the properties of order $o \in O$ as belonging to the user $u_o$ indiscriminately.
+The user logs on (is sent from the *World*) to the system and enters the *idle* state at placement time $a_o$.
+It immediately triggers the *submit order* event and enters the *waiting* state. 
+At time $a_o + t^u$, the *evaluate cancellation* event is triggered and *cancellation* policy $\mathbb{P}_{uc}$ is evaluated.
+If the user decides to cancel the order, the *cancel order* event is triggered, sent to the dispatcher, and the user logs off of the system.
+On the other hand, if the user decides to wait for the order, it returns back to the *waiting* state.
+When the order is delivered, at time $f_o + s^u$, the *order dropped off* event is triggered, and the user logs off of the system.
+If the order is canceled by the dispatcher, the *cancel order* event is triggered.
+
+```{r user, fig.cap='User state transition diagram.', out.width='100%', fig.align='center', echo=FALSE}
+knitr::include_graphics(path = './_figures/user.pdf', auto_pdf = TRUE)
+```
+
+**Events**
+
+- *Submit order* event: details how the user submits a new order.
+- *Evaluate cancellation* event: details how the user evaluates if it should cancel an order (incorporates *cancellation* policy).
+- *Cancel order* event: details the actions taken by a user to cancel an order.
+- *Order dropped off*: details the actions taken by a user when the order is dropped off.
+
+**States**
+
+- *Idle* state: passive actor state before submitting a new order.
+- *Waiting* state: state in which the user is waiting for the order to be dropped off.
+
+**Policies**
+
+- *Cancellation* policy: $\mathbb{P}_{uc}$ establishes how a user decides to cancel an order.
+
+### Courier {#courier}
+
+Figure \@ref(fig:courier) contains the state transition diagram for the courier.
+The courier logs on from the world at time $e_c$ and enters the *idle* state.
+At time $l_c$, the *log off* event is triggered and earnings are calculated.
+Apart from this event, there are two main event pipelines: the *evaluate movement* pipeline and the *notification* pipeline.
+
+The *evaluate movement* pipeline starts when the *evaluate movement* event is triggered at every time fraction $f_r$.
+It leads to the *movement evaluation* policy $\mathbb{P}_{me}$.
+If the courier decides not to move, it goes back to the *idle* state.
+On the other hand, if the courier decides to move from $\ell_{c, t}$ to $\ell_{c, t + 1}$, the *movement* event follows.
+It directs to the *moving* state.
+The movement mechanics are structured in the *movement* policy $\mathbb{P}_{mp}$.
+The pipeline ends with the courier going back to an *idle* state.
+
+The *notification* pipeline starts with the *notification* event arriving from the *idle* state.
+Immediately, the courier decides to accept or reject the notification based on the *acceptance* policy $\mathbb{P}_{ap}$.
+Should the courier reject this notification, it goes back to being in an *idle* state.
+If the notification is accepted, the courier enters the aforementioned *moving* state.
+The courier moves to the pick-up location $\ell_r$ and enters the *picking up* state.
+After service time $s^r$, the courier enters the *moving* state.
+Alternatively, the courier may receive additional $n_p$ notifications, in which case a partial *notification* pipeline is triggered where in case of acceptance or rejection, the courier is back at the *picking up* state.
+After arriving at the drop-off location $\ell_u$, the *dropping off* state starts.
+When service time $s^u$ ends, the courier moves to the other locations $\ell_u$ if $|s| > 0$, otherwise, the courier goes back to the *idle* state.
+
+```{r courier, fig.cap='Courier state transition diagram.', out.width='100%', fig.align='center', echo=FALSE}
+knitr::include_graphics(path = './_figures/courier.pdf', auto_pdf = TRUE)
+```
+
+**Events**
+
+- *Evaluate movement* event: details how the courier decides if it should move (incorporates the *movement evaluation* policy).
+- *Move* event: details the actions taken by the courier to move somewhere (incorporates the *moving* state and *movement* policy).
+- *Notification* event: details how a courier handles a new notification (incorporates the *acceptance* policy and subsequently the *picking up* and *dropping off* states).
+- *Log off* event: details how the courier logs off of the system (includes earnings calculations).
+
+**States**
+
+- *Idle* state: stand-by state of the courier. After moving and executing notifications, the courier always comes back to this state.
+- *Moving* state: establishes how the courier moves from an origin to a destination.
+- *Picking up* state: details the actions taken by a courier for picking up orders.
+- *Dropping off* state: details the actions taken by a courier for dropping off orders.
+
+**Policies**
+
+- *Movement evaluation* policy: $\mathbb{P}_{me}$ establishes how a courier decides whether and where it wants to relocate.
+- *Movement* policy: $\mathbb{P}_{mp}$ establishes how the courier moves about the city and between route stops.
+- *Acceptance* policy: $\mathbb{P}_{ap}$ establishes how a courier decides to accept or reject a notification.
+
+### Dispatcher {#dispatcher}
+
+Figure \@ref(fig:dispatcher) contains the state transition diagram for the dispatcher.
+The dispatcher is instantiated at the beginning of the *World* and enters a *listening* state.
+This is the only state, as the dispatcher's main task is orchestrating events.
+Some events that arrive are the *update / control* events, which are generalized events that trigger actions over an actor's state, but are self-contained and do not rely on policies or other events.
+For this reason, they are condensed into a single *update / control* event pipeline.
+The other three main pipelines of action for the dispatcher are: the *order submitted* pipeline, the *evaluate buffering* pipeline and the *evaluate prepositioning* pipeline.
+
+The *order submitted* pipeline starts when a user submits a new order at placement time $a_o$ and triggers the *order submitted* event.
+This event leads to the *buffer order* event, where, at preparation time $d_o$, the order is placed in the unassigned orders buffer.
+At time $d_o + t^u$ the *evaluate cancellation* event is triggered and dispatcher *cancellation* policy $\mathbb{P}_{dc}$ is evaluated.
+If the dispatcher decides to cancel the order, the *cancel order* event is triggered, along with the user's corresponding event; else, nothing further happens in this pipeline.
+
+The *evaluate buffering* pipeline starts with the triggering of the *evaluate buffering* event at every time fraction $f$.
+*Buffering* policy $\mathbb{P}_b$ determines if a *dispatch* event should be triggered or the order should be buffered.
+When the *dispatch* event is triggered, the *matching* policy $\mathbb{P}_m$ is called upon, and consequently, several (or none) *notification* events (containing $n_{pd}$ notifications) are triggered and sent to the courier.
+
+Lastly, the *evaluate prepositioning* pipeline starts when the *evaluate prepositioning* event is triggered at every time fraction $f_p$.
+The *prepositioning evaluation* policy $\mathbb{P}_{pe}$ determines if a *preposition* event is triggered.
+When this event is activated, the *prepositioning* policy $\mathbb{P}_p$ determines if *notification* events should be sent to the courier, carrying $n_p$ notifications.
+
+```{r dispatcher, fig.cap='Dispatcher state transition diagram.', out.width='100%', fig.align='center', echo=FALSE}
+knitr::include_graphics(path = './_figures/dispatcher.pdf', auto_pdf = TRUE)
+```
+
+**Events**
+
+- *Order submitted* event: details how the dispatcher handles the submission of a new order.
+- *Buffer order* event: details how the dispatcher buffers a newly created order.
+- *Evaluate cancellation* event: details the actions taken by the dispatcher to consider canceling an order (incorporates the *cancellation* policy).
+- *Cancel order* event: steps that the dispatcher takes to cancel an order.
+- *Evaluate buffering* event: establishes how the dispatcher evaluates if it should keep buffering orders or rather flush the buffer (incorporates the *buffering* policy and triggers the *dispatch* event).
+- *Dispatch* event: actions taken by the dispatcher to route and match orders and couriers (incorporates the *matching* policy and triggers the *notification* event).
+- *Notification* event: notify pick-up & drop-off notifications or prepositioning notifications to couriers.
+- *Preposition* event: actions taken by the dispatcher to preposition couriers (incorporates the *prepositioning* policy and triggers the *notification* event).
+- *Evaluate prepositioning* event: details the actions taken by the dispatcher to consider executing a prepositioning pipeline.
+- *Update / Control* event: the dispatcher has the faculty of controlling an updating the system based on what is happening. As such, it is in charge of updating user, order and courier properties.
+
+**States**
+
+- *Listening* state: the sole state of the dispatcher, since the role of this actor is to react and coordinate system changes.
+
+\newpage
+
+**Policies**
+
+- *Cancellation* policy: $\mathbb{P}_{dc}$ establishes how the dispatcher decides to cancel an order.
+- *Buffering* policy: $\mathbb{P}_{b}$ establishes how the dispatcher buffers orders before dispatching them, this is, when the dispatcher flushes the unassigned buffer.
+- *Matching* policy: $\mathbb{P}_{m}$ establishes how the dispatcher executes routing and matching between orders and couriers.
+- *Prepositioning* policy: $\mathbb{P}_{dp}$ establishes how the dispatcher executes prepositioning of couriers.
+- *Prepositioning evaluation* policy: $\mathbb{P}_{pe}$ establishes how the dispatcher decides if prepositioning should be done and how often.
+
+## Policies {#policies}
+
+The groundwork of the problem's mechanics is the main contribution of this research, as it was explained in the [**computational framework**](#computational_framework).
+Returning to the definition of the [**simulator**](#simulator), policies are the algorithms and models that govern how a certain process or decision is executed.
+Policies can be swapped around and different instances can be tested against different policies.
+For example, for the user *cancellation* policy $\mathbb{P}_{uc}$, option A can be tested.
+After a few runs, it can be changed in favor of option B.
+
+The notation for a policy $\mathbb{P}$ is defined as:
+
+\begin{equation} 
+  \mathbb{P}_{policy}(I_{policy}) \rightarrow P_{policy}'
+  (\#eq:policy)
+\end{equation}
+
+where $policy$ is the name of the policy, $I$ is the set of inputs $|I| \geq 1$ and $P'$ is the output $|P'| = 1$.
+A policy $\mathbb{P}$ can contain any type of logic: from an absolute rule up to an optimization algorithm.
+Extending the definition of Equation \@ref(eq:policy), the policies for the [**user**](#user), [**courier**](#courier) and [**dispatcher**](#dispatcher) are structured by definitions \@ref(def:user-cancellation-policy) through \@ref(def:dispatcher-prepositioning-evaluation-policy).
+
+```{definition, user-cancellation-policy, name="User Cancellation Policy"}
+The user decides if they want to cancel the order. 
+Inputs: courier assigned to the order. 
+Output: binary decision.
+\begin{align} 
+  \mathbb{P}_{uc}(c_o) &\rightarrow \{0, 1\}
+\end{align}
+```
+
+```{definition, courier-movement-evaluation-policy, name="Courier Movement Evaluation Policy"}
+The courier decides whether and where they want to move. 
+Inputs: current location of the courier. 
+Output: desired destination for the courier, if any.
+\begin{align} 
+  \mathbb{P}_{me}(\ell_{c, t}) &\rightarrow \ell_{c, t + 1} \cup \varnothing
+\end{align}
+```
+
+```{definition, courier-movement-policy, name="Courier Movement Policy"}
+Mechanics for moving the courier in the city. 
+Inputs: origin, destination and vehicle. 
+Output: none.
+\begin{align} 
+  \mathbb{P}_{mp}(\ell_1, \ell_2, v_c) &\rightarrow \varnothing
+\end{align}
+```
+
+```{definition, courier-acceptance-policy, name="Courier Acceptance Policy"}
+The courier decides if they want to accept a notification. 
+Inputs: acceptance rate, haversine distance to the notification. 
+Output: binary decision.
+\begin{align} 
+  \mathbb{P}_{ap}(p_c, h_{\ell_{c, t}, \ell_n}) &\rightarrow \{0, 1\}
+\end{align}
+```
+
+```{definition, dispatcher-cancellation-policy, name="Dispatcher Cancellation Policy"}
+The dispatcher decides if they want to cancel the order. 
+Inputs: courier assigned to the order. 
+Output: binary decision.
+\begin{align} 
+  \mathbb{P}_{dc}(c_o) &\rightarrow \{0, 1\}
+\end{align}
+```
+
+```{definition, dispatcher-buffering-policy, name="Dispatcher Buffering Policy"}
+The dispatcher decides if the order should be buffered or a dispatch event be triggered otherwise. 
+Inputs: present time. 
+Output: binary decision.
+\begin{align} 
+  \mathbb{P}_{b}(t) &\rightarrow \{0, 1\}
+\end{align}
+```
+
+```{definition, dispatcher-matching-policy, name="Dispatcher Matching Policy"}
+The dispatcher matches orders to couriers. 
+Inputs: orders, couriers and the present time. 
+Output: notifications, if any.
+\begin{align} 
+  \mathbb{P}_{m}(O, C, t) &\rightarrow \{n_{pd}, \text{ } \forall \text{ } n_{pd} \in N\} \cup \varnothing
+\end{align}
+```
+
+```{definition, dispatcher-prepositioning-policy, name="Dispatcher Prepositioning Policy"}
+The dispatcher prepositions couriers.
+Inputs: orders, couriers and the present time. 
+Output: prepositioning notifications, if any.
+\begin{align} 
+  \mathbb{P}_{dp}(O, C, t) &\rightarrow \{n_{p}, \text{ } \forall \text{ } n_{p} \in N\} \cup \varnothing
+\end{align}
+```
+
+```{definition, dispatcher-prepositioning-evaluation-policy, name="Dispatcher Prepositioning Evaluation Policy"}
+The dispatcher decides if they want to trigger a prepositioning event. 
+Inputs: present time. 
+Output: binary decision.
+\begin{align} 
+  \mathbb{P}_{pe}(t) &\rightarrow \{0, 1\}
+\end{align}
+```
+
+Having formalized the general type of policies available in the computational framework, the particular policies are introduced.
+A particular policy $\mathbb{P}'$[`particular`] implements the function or logic that allows for $I \rightarrow P'$.
+In other words, $\mathbb{P}'$ is the implementation of $\mathbb{P}$, such that:
+
+\begin{equation} 
+  \mathbb{P}'_{policy}[\text{particular}](I_{policy}) \rightarrow P_{policy}' = f(...)
+  (\#eq:particular-policy)
+\end{equation}
+
+where $f(...)$ is the actual implementation of the `particular` policy.
+Several particular policies are implemented in this research to showcase how they leverage on the computational framework to provide solutions around the MDRP.
+
+### User Policies {#user_policies}
+
+For the user *cancellation* policy, a `random` policy is defined by Equation \@ref(eq:user-cancellation):
+
+\begin{equation} 
+  \mathbb{P}'_{uc}[\text{random}](c_o) \rightarrow \{0, 1\} =
+    \begin{cases}
+       X \sim U(0, 1) \geq x_u & c_o = \varnothing \\
+       0 & c_o \neq \varnothing \\
+    \end{cases}
+  (\#eq:user-cancellation)
+\end{equation}
+
+where a random variable $X$ is compared against the user cancellation probability $x_u$.
+The user randomly decides if they want to cancel the order as long as no courier is assigned.
+
+### Courier Policies {#courier_policies}
+
+The courier's *acceptance* policy is proposed as an `absolute` policy (where all notifications are accepted) in Equation \@ref(eq:courier-absolute) or a `uniform` policy in Equation \@ref(eq:courier-uniform), where the uniform distribution is evaluated to determine is a courier accepts a notification.
+
+\begin{equation} 
+  \mathbb{P}'_{ap}[\text{absolute}](c_o) \rightarrow \{0, 1\} = 1
+  (\#eq:courier-absolute)
+\end{equation}
+
+\begin{equation} 
+  \mathbb{P}'_{ap}[\text{uniform}](c_o) \rightarrow \{0, 1\} =
+  \begin{cases}
+       1 & X \sim U(0, 1) \leq p_c \\
+       0 & \text{otherwise} \\
+    \end{cases}
+  (\#eq:courier-uniform)
+\end{equation}
+
+where a random variable $X$ that is distributed uniformly is compared against the courier's acceptance rate $p_c$.
+The courier randomly decides if they want to accept the notification, otherwise, it is rejected.
+
+To realistically move about the city, a `osrm` *movement* policy $\mathbb{P}_{mp}'[\text{osrm}]$ is proposed.
+The *OSRM* ([Open Source Routing Machine](http://project-osrm.org/))[@osrm] service is used, as showcased in Figure \@ref(fig:computational-framework).
+The service receives a request containing an origin $\ell_1$, a destination $\ell_2$ and a vehicle $v \in V$.
+The origin and destination are $(lat, lng)$ tuples.
+The docker-mounted server returns a series of waypoints, corresponding to the intersections in the city that make up the route.
+For each leg of the route (pair of intersections) $\ell_1'$ to $\ell_2'$, a haversine distance is calculated $h_{\ell_1', \ell_2'}$.
+This is shown in Figure \@ref(fig:osrm-example).
+This distance is then divided by the default velocity of a vehicle $v \in V$, to obtain the time it would take to complete that leg of the journey.
+If all the times are added together, it results in an approximation to how long it would take to realistically move from an origin to a destination.
+This time is used to move couriers while time in the simulator advances.
+In Figure \@ref(fig:osrm-example), this means that $b_{A, F} = \frac{h_{A, B} + h_{B, C} + h_{C, D} + h_{D, E} + h_{E, F}}{v_{velocity}}$.
+
+```{r osrm-example, fig.cap='Example of how the OSRM service calculates movement times.', out.width='60%', fig.align='center', echo=FALSE}
+knitr::include_graphics(path = './_figures/osrm.pdf', auto_pdf = TRUE)
+```
+
+The last policies defined for the courier are the *movement evaluation* policies.
+The `still` and `neighbors` policies are proposed.
+The `still` *movement evaluation* policy is shown in Equation \@ref(eq:courier-still) and all it says is the courier always decides to stay put.
+
+\begin{equation} 
+  \mathbb{P}_{me}'[\text{still}](\ell_{c, t}) \rightarrow \ell_{c, t + 1} \cup \varnothing = \varnothing
+  (\#eq:courier-still)
+\end{equation}
+
+On the other hand, the `neighbors` *movement evaluation* policy is explained in Algorithm \@ref(alg:neighbors) and is based around the concept of geohash and geohash neighborhoods.
+
+\begin{algorithm}[H]
+  \label{alg:neighbors}
+  \DontPrintSemicolon
+  \SetAlgoLined
+  \SetKwInput{KwResult}{Policy}
+  \KwResult{$\mathbb{P}_{me}'[\text{neighbors}]$}
+  \SetKwInOut{Input}{Input}
+  \SetKwInOut{Output}{Output}
+  \Input{$(\ell_{c, t})$}
+  \Output{$\ell_{c, t + 1} \cup \varnothing$}
+  \BlankLine
+  \uIf{$\text{random} \leq \text{movement probability}$}{
+    $\text{geohash} \leftarrow \text{geoEncode}(\ell_{c, t}, \text{precision}=6)$ \newline
+    $\dots \text{Obtain a geohash from the courier location with a level 6 precision}$\;
+    $\text{geohashNeighbors} \leftarrow \text{geoNeighbors}(\text{geohash}) \dots \text{Obtain a neighborhood of 8 geohashes}$\;
+    $\text{chosenGeohash} \leftarrow \text{choose} \{ \text{geohashNeighbors} \} \dots \text{Randomly select the destination geohash}$\;
+    $\ell_{c, t + 1} \leftarrow \text{geoDecode} \{ \text{chosenGeohash} \} $ \newline
+    $\dots \text{Obtain a location inside the chosen geohash like its center}$\;
+  }
+  \Else{
+    $\ell_{c, t + 1} \leftarrow \varnothing \dots \text{If the courier decides not to move, then his destination is null}$\;
+  }
+  \Return{$\ell_{c, t + 1}$}
+  \caption{Geohash neighbors heuristic}
+\end{algorithm}
+
+Based on a certain movement probability for the courier, this is, if the courier decides to move, a neighborhood of geohashes is generated.
+From that neighborhood, one of the geohashes is randomly chosen.
+A location $\ell$ inside that geohash is obtained and selected as the destination for the courier.
+If the courier decides not to move, Algorithm \@ref(alg:neighbors) returns an empty destination.
+Recall that a courier decides to move at every $f_r$ time fraction.
+
+### Dispatcher Policies {#dispatcher_policies}
+
+For the dispatcher *cancellation* policy, a `static` policy is defined by Equation \@ref(eq:dispatcher-cancellation).
+If no courier is assigned to the order, the order is immediately canceled.
+
+\begin{equation} 
+  \mathbb{P}'_{dc}[\text{static}](c_o) \rightarrow \{0, 1\} =
+    \begin{cases}
+       1 & c_o = \varnothing \\
+       0 & c_o \neq \varnothing \\
+    \end{cases}
+  (\#eq:dispatcher-cancellation)
+\end{equation}
+
+The dispatcher *buffering* policy has a `rolling-horizon` implementation defined by Equation \@ref(eq:dispatcher-buffering).
+The dispatcher buffers orders until $f$ and consequently flushes the unassigned buffer.
+
+\begin{equation} 
+  \mathbb{P}'_{b}[\text{rolling-horizon}](t) \rightarrow \{0, 1\} =
+    \begin{cases}
+       1 & t \mod f = 0 \\
+       0 & t \mod f \neq 0 \\
+    \end{cases}
+  (\#eq:dispatcher-buffering)
+\end{equation}
+
+Following the same approach as Equation \@ref(eq:dispatcher-buffering), there is a `fixed` dispatcher *prepositioning evaluation* policy defined in Equation \@ref(eq:dispatcher-prepositioning-evaluation). 
+The dispatcher waits until $f_p$ to apply the *prepositioning* policy $\mathbb{P}_{dp}$.
+
+\begin{equation} 
+  \mathbb{P}'_{pe}[\text{fixed}](t) \rightarrow \{0, 1\} =
+    \begin{cases}
+       1 & t \mod f_p = 0 \\
+       0 & t \mod f_p \neq 0 \\
+    \end{cases}
+  (\#eq:dispatcher-prepositioning-evaluation)
+\end{equation}
+
+A straight forward *prepositioning* policy $\mathbb{P}_{dp}$ is a `naive` approach, where simply no prepositioning notifications are sent, as depicted in Equation \@ref(eq:dispatcher-prepositioning).
+
+\begin{equation} 
+  \mathbb{P}'_{dp}[\text{naive}](t) \rightarrow \{n_{p}, \text{ } \forall \text{ } n_{p} \in N\} \cup \varnothing = \varnothing
+  (\#eq:dispatcher-prepositioning)
+\end{equation}
+
+The *matching* policies proposed are more complex and thus are organized in a separate section.
+
+#### Dispatcher Matching Policies {#dispatcher_matching_policies}
+
+To have a baseline to which other *matching* policies can be compared against, a simple `greedy` *matching* policy $\mathbb{P}_m'[\text{greedy}]$ is implemented in Algorithm \@ref(alg:greedy).
+
+\begin{algorithm}[H]
+  \label{alg:greedy}
+  \DontPrintSemicolon
+  \SetAlgoLined
+  \SetKwInput{KwResult}{Policy}
+  \KwResult{$\mathbb{P}_m'[\text{greedy}]$}
+  \SetKwInOut{Input}{Input}
+  \SetKwInOut{Output}{Output}
+  \Input{$(O, C, t)$}
+  \Output{$\{n_{pd}, \text{ } \forall \text{ } n_{pd} \in N\} \cup \varnothing$}
+  \BlankLine
+  $\text{NotifiedCouriers} \leftarrow \{\} \dots \text{Initialize empty notified couriers}$\;
+  $N_t \leftarrow \{\} \dots \text{Initialize empty notifications}$\;
+  \For{$o \in O$}{
+    $\displaystyle \text{SelectedCourier} \leftarrow \arg \min_{c \in C: c \notin \text{NotifiedCouriers}}{\{b_{\ell_{c, t}, \ell_{r_o}}\}} \dots \text{Select the minimum cost courier}$\;
+    \If{$\text{SelectedCourier} \notin N_t \cup \text{NotifiedCouriers}$}{
+      $\text{NotifiedCouriers} \leftarrow \text{NotifiedCouriers} \cup \{\text{SelectedCourier}\} \dots \text{Cross out notified courier}$\;
+      $\text{create } n_{pd} \dots \text{Create a new notification}$\;
+      $c_{n_{pd}} \leftarrow \text{SelectedCourier} \dots \text{Set selected courier to new notification}$\;
+      $s_{n_{pd}} \leftarrow \{o\} \dots \text{Set order as a single route to new notification}$\;
+      $N_t \leftarrow N_t \cup \{n_{pd}\} \dots \text{Append new notification}$\;
+    }
+  }
+  \Return{$N_t$}
+  \caption{Greedy matching algorithm}
+\end{algorithm}
+
+For each order, the minimum-cost courier that can be matched is selected and excluded from the available couriers.
+The notification is saved and the next order is processed, until all orders are matched or no couriers remain available.
+$\mathbb{P}_m'[\text{greedy}]$ should be executed as a rolling horizon strategy, with $f>0$.
+
+For more elaborate *matching* policies, orders are first bundled into routes and these routes are matched to couriers.
+To calculate routes, a target route size $Z_t$ is defined by Equation \@ref(eq:route-size), adapted from @mdrp.
+
+\begin{equation} 
+  \displaystyle Z_t = \max \left[ \left \lceil{\frac{|\{o \in O_t: e_o \leq t + \Delta_1\}|}{|\{c \in C_t: s_c = \varnothing\}|}} \right \rceil, S_{max} \right], \space \Delta_1 > 0
+  (\#eq:route-size)
+\end{equation}
+
+where $O_t$ are the unassigned orders at time $t \in T$, $C_t$ are the idle and picking-up couriers at time $t \in T$, and $\Delta_1$ is set through any tuning procedure.
+The target route size $Z_t$ defined by Equation \@ref(eq:route-size) is used in Algorithm \@ref(alg:routes) to calculate the set of routes $S_t$ at time $t \in T$.
+
+\begin{algorithm}[H]
+  \label{alg:routes}
+  \DontPrintSemicolon
+  \SetAlgoLined
+  \SetKwInOut{Input}{Input}
+  \SetKwInOut{Output}{Output}
+  \Input{$O_t, C_t, Z_t$}
+  \Output{$S_t$}
+  \BlankLine
+  \For{$r \in R_t \dots \text{For each restaurant}$}{
+    $O_r \leftarrow \{o, \space \forall \space o \in O_t: r_o = r\} \dots \text{Obtain orders for the restaurant}$\;
+    $O_r^* \leftarrow \{O_r^i, \space \forall \space i \in |O_r| - 1: e_{O_r^i} \leq e_{O_r^{i + 1}}\} \dots \text{Sort orders by increasing ready time}$\;
+    $C_r \leftarrow \{c \in C_t: h_{\ell_c, \ell_r} \leq d\} $ \newline
+    $\dots \text{Obtain couriers linked to the restaurant, based on a linear distance}$\;
+    $m_r \leftarrow \max \left(|C_r|, \left \lceil \frac{|O_r^*|}{Z_t} \right \rceil \right) \dots \text{Obtain number of routes to create}$\;
+    $S_r \leftarrow \{\varnothing, \space \forall \space i = 1 \dots m_r\} \dots \text{Initialize empty routes for the restaurant}$\;
+    \If{$\text{assignment updates allowed}$}{
+      $C_r^* \leftarrow \{c \in C_r: s_c \neq \varnothing \text{ } \& \text{ } r_o = r, \forall o \in s_c\}$ \newline
+      $\dots \text{Obtain couriers with non-empty routes whose pick-up location is the restaurant}$\;
+      $S_r \leftarrow S_r \cup \{s_c, \space \forall \space c \in C_r\}$ \newline
+      $\dots \text{Append courier routes to the empty routes to be able to update the courier's assignments}$\;
+    }
+    \For{$o \in O_r^*$}{
+      $\displaystyle \text{Find the route } s \in S_r \text{ and the insertion position } i_s \text{ for the order that minimizes the increase in route cost: }$ \newline
+      $\sum_{(\ell_1, \ell_2) \in s}{b_{\ell_1, \ell_2}} + \sum_{\ell \in s} s^\ell$\;
+      \If{$\text{Insertion decreases route efficiency}$}{
+        $\text{Disregard } s \text{ for order } o \text{ and find the next best route and insertion position}$\;
+      }
+      $s^{i_s} \leftarrow o \dots \text{insert order } o \text{ in route } s \text{ at position } i_s$\;
+    }
+  }
+  \Return{$S_t$}
+  \caption{Routes generation using parallel-insertion}
+\end{algorithm}
+
+where $d$ is the maximum linear distance a courier can be away from a restaurant, $m_r$ is the number of routes to create at restaurant $r \in R$, and $s^\ell$ is the service time at a location $\ell$ ($s^r$ or $s^u$).
+Algorithm \@ref(alg:routes) is based on Procedure 1 of @mdrp but modified to include assignment updates if desired, although the original heuristic can be executed.
+With the routes $S_t$ obtained in Algorithm \@ref(alg:routes), two linear assignment models are defined: an integer program in Definition \@ref(def:integer-model) and a network flow formulation in Definition \@ref(def:graph-model).
+The cost function for the assignment models, this is, $g_{c, s}$: if route $s$ where to be assigned to courier $c$, is shown in Equation \@ref(eq:cost) and uses the following notation [@mdrp]:
+
+- $\theta$: penalty for a delayed drop-off.
+- $\pi_{s, c}$: pick-up time of route $s$ if assigned to courier $c$. $\displaystyle \pi_{s, c} \geq \max_{o \in s}\{ e_o \}$.
+- $\delta_{o, c}^s$: drop-off time of order $o$ in route $s$ if assigned to courier $c$.
+
+\begin{equation}
+\displaystyle
+  g_{c, s} = \frac{|s|}{\max_{o \in s}\{ \delta_{o, c}^s \}} - \theta \left( \pi_{s, c} - \max_{o \in s}\{ e_o \} \right)
+  (\#eq:cost)
+\end{equation}
+
+```{definition, integer-model, name="Integer assignment model"}
+\begin{align} 
+  \displaystyle
+  \max \text{ } &\sum_{c \in C_t}{ \sum_{s \in S_t}{g_{c, s}x_{c, s}} } \\
+  \text{s.t. } \sum_{s \in S_t}{x_{c, s}} &\leq 1, \text{ } \forall c \in C_t \\
+  \sum_{c \in C \cup \{ 0 \}}{x_{c, s}} &= 1, \text{ } \forall s \in S_t \\
+  x_{c, s} &\in \{ 0, 1 \}, \text{ } \forall s \in S_t, c \in C_t \cup \{ 0 \}
+\end{align}
+```
+
+where $x_{c, s}$ is a binary decision variable that establishes if courier $c \in C_t$ is assigned to route $s \in S_t$.
+There is an artificial courier $0$ that collects excess routes.
+The value of such assignments is 0.
+
+```{definition, graph-model, name="Network flow assignment model"}
+\begin{align} 
+  \displaystyle
+  \max \text{ } &\sum_{(i, j) \in A^*}{c_{i, j}^*x_{i, j}} \\
+  \text{s.t. } \sum_{j \in N^*}{x_{i, j}} - \sum_{j \in N^*}{x_{j, i}} &= b_i^*, \text{ } \forall i \in N^* \\
+  x_{i, j} &\geq 0, \text{ } \forall (i, j) \in A^*
+\end{align}
+```
+
+where $A^*$ is the set of arcs, $N^*$ is the set of nodes, $c_{i, j}^*$ is the matching cost ($g_{c, s}$ for assignment arcs), $b_i^*$ is the demand of node $i \in N^*$, and $x_{i, j}$ is the variable that captures the flow through the arcs in the network.
+There is a supply node whose demand is $|S_t|$.
+There is a node for each courier $c \in C_t$ with a demand of $0$.
+There is a node for each route $s \in S_t$ with a demand of $-1$.
+Arcs depart from the supply node to the courier nodes with a cost of $0$.
+In addition, there are arcs that depart from the supply and go toward the route nodes.
+These arcs activate when a route could not be matched to a courier and thus have a cost of zero.
+Arcs that depart from the courier nodes and arrive at the route nodes have the cost structure given in Equation \@ref(eq:cost).
+
+Calculating every possible combination when matching is disadvantageous, given that many prospective matches can de discarded beforehand.
+For example, a courier who is on the other side of the city with respect to an order can be discarded, as this match will never get chosen (from the service side this will result in a terrible customer experience) and adds unnecessary complexity to Definitions \@ref(def:integer-model) and \@ref(def:graph-model).
+If prospects are incorporated in the matching policy, then Definition \@ref(def:prospects) should be coupled.
+
+```{definition, prospects, name="Matching prospects"}
+Only create a matching variable $x_{c, s}$ for courier $c \in C$ and route $s \in S$, if all the following conditions are met:
+
+\begin{align}
+  \displaystyle
+    h_{\ell_c, \ell_r} &\leq d 
+    \label{eq:prospects-distance} \\
+    |\pi_{s, c} - \max_{o \in s}\{ e_o \}| + \sum_{o \in s}{|f_o´ - \delta_{o, c}^s|} &\leq \beta 
+    \label{eq:prospects-offset} \\
+    s_c &\subset s: s_c \neq \varnothing
+    \label{eq:prospects-routes}
+\end{align}
+```
+
+Equation \@ref(eq:prospects-distance) establishes that a courier can not be very far away from the restaurant.
+Equation \@ref(eq:prospects-offset) uses $\beta$ as a maximum allowed total off-set from the stops' expected time.
+For pick-up stops, the expected time is the ready time $e_o$.
+For drop-off stops, the expected time is the user's expected drop-off time $f_o'$.
+Equation \@ref(eq:prospects-routes) establishes that if an order was inserted into a courier's route (an assignment update) then the newly formed route must correspond to the courier.
+If these conditions are met, then the matching variable can be created.
+
+The last aspect of creating new *matching* policies departing from the routes, matching prospects and exact matching is processing each tentative assignment $n_{pd} \in N_t$ with a commitment strategy that dictates [@mdrp]:
+
+1. If $c_n$ can arrive at $\ell_n$ before $t + f$ and all orders in $s_n$ are ready by $t + f$ then keep $n$ as a pick-up & drop-off notification ($n_{pd}$).
+1. If $c_n$ cannot reach $\ell_n$ by $t + f$ and is idle then transform $n$ to a prepositioning notification $n_p$.
+This is done to have a backup in case no other best courier is found.
+1. If any order in $s_n$ has been ready for a long time (loosely defined), keep the notification and execute it immediately.
+
+With this commitment strategy, the system opts to keep service quality as high as possible having couriers arriving just in time at the pick-up locations.
+
+Combining the calculation of routes from Algorithm \@ref(alg:routes), the matches obtained from model \@ref(def:integer-model) or \@ref(def:graph-model), the definition of prospects from Definition \@ref(def:prospects), and the commitment strategy, a myopic *matching* policy is defined in Algorithm \@ref(alg:matching).
+This myopic *matching* policy should be executed as a rolling horizon approach, being processed every $f$ fraction of time, $f > 0$.
+
+\begin{algorithm}[H]
+  \label{alg:matching}
+  \DontPrintSemicolon
+  \SetAlgoLined
+  \SetKwInput{KwResult}{Policy}
+  \KwResult{$\mathbb{P}_m'[\dots]$}
+  \SetKwInOut{Input}{Input}
+  \SetKwInOut{Output}{Output}
+  \Input{$(O, C, t)$}
+  \Output{$\{n_{pd}, \text{ } \forall \text{ } n_{pd} \in N\} \cup \varnothing$}
+  \BlankLine
+  $S_t \leftarrow \text{Generate routes with or without assignment updates}$\;
+  $\{x_{c, s}, \text{ } \forall s \in S_t, c \in C_t\} \leftarrow \text{Generate matching prospects based on conditions}$\;
+  $N_t \leftarrow \text{Generate matches (notifications) using an assignment model}$\;
+  \For{$n \in N_t$}{
+    $\text{Execute commitment strategy}$\;
+  }
+  \Return{$N_t$}
+  \caption{Myopic matching policy}
+\end{algorithm}
+
+Considering Algorithm \@ref(alg:matching), several *matching* policies are defined in Table \@ref(tab:matching-policies).
+
+\begin{table}[h!]
+  \begin{center}
+    \caption{Definition of myopic matching policies}
+    \label{tab:matching-policies}
+    \begin{tabular}{lcclc}
+      \hline
+      \textbf{Policy} & \textbf{Assignment} & \textbf{Prospects} & \textbf{Matcher} & \textbf{Commitment} \\
+       & \textbf{Updates} & & & \textbf{Strategy} \\
+      \hline
+      $\mathbb{P}_m'[\text{mdrp}]$ &  &  & Integer & $\checkmark$ \\
+      $\mathbb{P}_m'[\text{mdrp-graph}]$ &  &  & Network Flow & $\checkmark$ \\
+      $\mathbb{P}_m'[\text{mdrp-graph-prospects}]$ & & $\checkmark$ & Network Flow & $\checkmark$ \\
+      $\mathbb{P}_m'[\text{modified-mdrp}]$ & $\checkmark$ & $\checkmark$ & Network Flow & $\checkmark$ \\
+      \hline
+    \end{tabular}
+  \end{center}
+\end{table}
+
+Note that $\mathbb{P}_m'[\text{mdrp}]$ is an implementation of @mdrp.
+
+

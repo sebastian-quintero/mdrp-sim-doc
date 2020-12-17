@@ -1,0 +1,30 @@
+--- 
+title: "Computational Framework for Solving the Meal Delivery Routing Problem"
+subtitle: Sebastián Quintero Rojas (s.quintero425@uniandes.edu.co)
+author:
+- Department of Industrial Engineering
+- Universidad de Los Andes. Bogotá, Colombia
+date: "`r Sys.Date()`"
+output: 
+  bookdown::pdf_book:
+    includes:
+      in_header: preamble.tex
+    keep_tex: no
+    latex_engine: xelatex
+    citation_package: biblatex
+    extra_dependencies: ["algorithm2e"]
+    fig_crop: no
+    toc: no
+abstract: "The Meal Delivery Routing Problem (MDRP) is a problem in which an online restaurant aggregator receives orders from diners and matches couriers that perform the pick-up and drop-off of these requests. These operations have become more popular over the past few years and on-demand delivery has gained special traction during the COVID-19 pandemic. There are many challenges involved in this problem: the order arrival stream is highly dynamic and uncertain, the fleet works under the gig economy model in which they have the freedom to reject requests and log on and off as they please, most orders are expected to be delivered in under 40 minutes and there are stakeholders with conflictive interests. In this research a computational framework is presented to handle an environment where solutions to the MDRP may be tested. At the core, there is a discrete events simulator which accurately represents the components of a meal delivery operation. The simulator has blocks where policies are embedded, that represent how actors make decisions or take actions. The proposed framework is modular, hence specific blocks may be interchanged so that different policies can be compared or new ones introduced. The computational framework is designed to transparently load instances and inputs, execute the simulation and output performance metrics. In addition, the MDRP is given new definitions. Lastly, real-life instances are provided for testing. \\par \\textbf{Keywords:} On-Demand Delivery, Meal Delivery, Dynamic Vehicle Routing, Matching, Discrete Events Simulation."
+bibliography: references.bib
+biblio-style: apa
+link-citations: yes
+description: ''
+site: bookdown::bookdown_site
+geometry: "left=3cm, right=3cm, top=2.5cm, bottom=2.5cm"
+urlcolor: blue
+linkcolor: blue
+documentclass: article
+papersize: letter
+toc-depth: 3
+---

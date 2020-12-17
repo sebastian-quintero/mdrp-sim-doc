@@ -1,0 +1,5 @@
+book_filename: "computational_framework_mdrp"
+delete_merged_file: true
+language:
+  ui:
+    chapter_name: "Chapter "

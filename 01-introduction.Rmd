@@ -1,0 +1,64 @@
+---
+title: "01-introduction"
+output: pdf_document
+---
+
+# Introduction {#introduction}
+
+On-demand delivery is a logistic problem in which customers order goods and services via mobile or web applications that connect them to providers.
+There is a system controller which receives the requests and assigns them to facilitators that visit the service providers to execute a pick-up and arrive at the customer's location to finalize the order with the corresponding drop-off.
+In this context, meal delivery is one of the most important on-demand delivery industries, where orders are placed by customers at a volatile and uncertain rate.
+This problem is framed in the gig economy model, where freelance couriers enable the delivery of these meals.
+
+Mobile applications are projected to generate approximately 935 billion USD in revenue in 2023 [@on_demand_statistics].
+Moreover, the global food delivery mobile app market is expected to hit 16.6 billion USD by 2023, at a compound-annual growth rate of 27.9 percent [@delivery_app_market].
+In the recent context of the COVID-19 pandemic, US sales for meal delivery services grew 135 percent in October of 2020 [@second_measure_food_delivery].
+In smaller markets such as Colombia, the COVID-19 pandemic has shown an increase of up to 300 percent in e-commerce platforms [@forbes_colombia].
+Big players such as Uber Eats, GrubHub and Delivery Hero showcase the same challenges as smaller companies such as Rappi, Grab or Glovo: delivering meals as fast as possible, with a high level of service quality by orchestrating a fleet of freelance couriers.
+These statistics speak not only about the market opportunity of doing research on the meal delivery business but also its impact on customers.
+
+The problem of delivering meals to customers has been addressed in several works [@mdrp; @provably; @dynamic_courier_routing; @meal_delivery_problem], although not as extensively as more traditional problems (e.g., VRP).
+The Meal Delivery Routing Problem (MDRP) captures several aspects of the operation in meal delivery services.
+There are four stakeholders: the customers ordering meals, the restaurants that prepare them, the couriers who deliver the food and the company, or aggregator, who coordinates the other stakeholders.
+Each of them hold a different goal they pursue and behave accordingly, leading to multiple challenges.
+Customers want their meals delivered on-time, maintaining the quality of the food.
+Restaurants want a courier placed in their location to guarantee a cooked meal will be delivered without delay, as they have a continuous stream of orders coming in.
+Independent couriers want to achieve high earnings for delivering orders and are picky about which requests they accept, adding uncertainty in the operation.
+Lastly, the company who aggregates these requests must orchestrate every aspect of the operation, without having any downtime and making decisions under stochastic conditions.
+In short, meal delivery presents a highly complex transportation problem where a large number of variables interact among each other.
+
+Top delivery companies have arrival rates for orders that range from tens to hundreds per minute, deriving in a challenge that is not only analytical (developing prescriptive and predictive models) but also technical (having a scalable and robust software architecture).
+This leads to an important aspect which is understanding the system as a whole and the interactions that take place, before designing the solutions that attack the logistic problems mentioned.
+Part of this aspect consists of making available real-life data for further research.
+Some academic research relies on artificially creating instances that do not reflect real locations and times, but rather follow a probability distribution, such that outcomes obtained under these conditions are ideal at best and instance size tends to be very small.
+Given the volume of the operation, it is important to test solutions in a controlled environment that does not affect production.
+Devising strategies to prepare the system in advance can provide an edge over the usual myopic decisions that are made by businesses.
+It is challenging to establish a holistic framework where the delivery problem can be studied and treated, given that most solutions are tailor-made for a single context.
+
+On the face of this challenge, this research proposes a computational framework that captures the dynamics of the MDRP, with a discrete events simulator at its core.
+The framework allows for input loading, solution processing and output saving, enabling robust and informed simulation of MDRP solutions.
+The framework should be applicable to real-life conditions, thus a set of real instances are provided by the company Rappi and constitute the main input of the framework.
+This is done to encourage the development of solutions from real, as opposed to purely academic, data.
+In this fashion, real locations and time stamps constitute the inputs of the instances and the complete volume of data reflects the dimensions of the problem.
+An important component of the framework is the World: a module that orchestrates the arrival of new customers and couriers and advances the internal clock of the system.
+The simulator embeds policies to simulate how decisions or actions are made.
+A policy is a set of rules, algorithms, models or any other type of analytical solution that govern an action.
+The simulator is designed to have interchangeable policies that fulfill different needs.
+Policies are conceived as building blocks in the framework: they can be plugged in or out and the definition of standard inputs and outputs facilitate their interaction with the World.
+With this, further research can focus on developing novel and interesting policies.
+The framework outputs a set of widely used performance metrics, with the aim of using them as a comparison tool to decide which policies provide the best solution for a specific system condition.
+The design makes the framework lightweight and highly versatile: it can represent a specific time window within a day, with the potential of simulating full weeks of operation.
+In addition to the framework, new definitions are given to the MDRP, with missing dynamics from a real-life operation.
+All of these contributions face the challenge that is understanding the computational complexity of the MDRP and providing a platform where hypotheses can be tested aiming at better understanding the variability in the processes and the impact of adopted decisions and policies.
+
+The rest of this document is organized as follows:
+
+- Section \@ref(literature-review) contains a review of the related literature.
+- Section \@ref(research-guidelines) specifies the guidelines of this research.
+- Section \@ref(problem-description) formally describes the definition of the MDRP, including structural assumptions and performance metrics.
+- Section \@ref(methodology) describes the framework along with the simulator and proposed policies.
+- Section \@ref(results-discussion) describes the instances provided, how they are used in computational experiments and discusses the results of these experiments.
+- Section \@ref(conclusions) sums up the contents of this research while providing concluding remarks and future recommendations.
+- Appendix \@ref(glossary) provides a glossary for terminology.
+- Appendix \@ref(scenarios-description) provides the configurations for test scenarios.
+- Appendix \@ref(linpack-benchmark) describes how to benchmark the computers used in this research.

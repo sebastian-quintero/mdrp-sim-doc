@@ -1,0 +1,889 @@
+---
+title: "06-results"
+output: pdf_document
+---
+
+# Results and Discussion {#results-discussion}
+
+## Instances {#instances}
+
+24 real-life instances are provided by the company Rappi.
+Each instance is a complete day of operation (12 a.m. to 11:59 p.m.) for a specific city.
+The instances span six cities, thus providing four different scenarios for each city considered.
+Figure \@ref(fig:instances-sizes) shows the sizes of each instance and their classification as a small (*S*), medium (*M*) or large (*L*) instance.
+In Table \@ref(tab:instances-classification), the different instances are classified by size.
+These real and large instances provide a clear opportunity for academic research, due to the size and quality of data.
+
+```{r instances-sizes, fig.cap='Number of orders and couriers provided in the different instances.', fig.align='center', fig.width=7, fig.height=6, echo=FALSE, eval=TRUE, results='hide', message=FALSE, crop=NULL, out.width='70%', warning=FALSE}
+# Packages
+library(pacman)
+pacman::p_load(readr, dplyr, ggplot2, scales, ggrepel)
+
+# Constants
+raw_dir <- './_raw_data/'
+
+# Import data
+data <- read_csv(paste0(raw_dir, 'instance_data.csv'))
+
+# Process data
+data <- data %>% 
+  mutate(
+    saturation = orders / couriers,
+    size = case_when(
+      orders < 10000 ~ 'S',
+      orders < 30000 ~ 'M',
+      TRUE ~ 'L'
+    )
+  )
+data$size <- factor(data$size, levels = c('S', 'M', 'L'))
+
+# Plot data
+plot <- ggplot(data = data, mapping = aes(x = couriers, y = orders)) +
+  geom_point(mapping = aes(shape = size, color = size), size = 5) +
+  geom_point(mapping = aes(shape = size), color = 'grey95', size = 2) +
+  scale_x_continuous(labels = scales::comma, breaks = seq(0, 18000, 2000), limits = c(0, 18000)) +
+  scale_y_continuous(labels = scales::comma, breaks = seq(0, 60000, 10000), limits = c(0, 60000)) +
+  theme_classic() +
+  labs(
+    title = 'Instances size',
+    subtitle = '24 instances - 6 cities',
+    x = 'Couriers',
+    y = 'Orders'
+  ) +
+  theme(
+    legend.position = 'bottom',
+    panel.grid.major.x = element_line(color = 'grey85'),
+    panel.grid.major.y = element_line(color = 'grey85')
+  )
+plot
+```
+
+\begin{table}[h!]
+\begin{center}
+\caption{Classification of instances}
+\label{tab:instances-classification}
+\begin{tabular}{cl}
+\hline
+\textbf{Size} & \textbf{Instances} \\
+\hline
+\textbf{S} & 1, 3, 4, 5, 7, 9, 10, 11, 13, 15, 16, 17, 19, 21, 22, 23 \\
+\textbf{M} & 2, 8, 14, 20 \\
+\textbf{L} & 0, 6, 12, 18 \\
+\hline
+\end{tabular}
+\end{center}
+\end{table} 
+
+In the DDBB, the tables *couriers_instance_data* and *orders_instance_data* contain the information for the different instances.
+The *couriers_instance_data* table has information about all the couriers that came online for that day and is composed of the following columns:
+
+- *courier_id*: an id to identify a courier.
+- *vehicle* ($v_c$): mode of transportation. Can be: walking, bicycle, motorcycle or car.
+- *on_lat* (part of $\ell_c$): latitude of the courier's position at the start of the shift.
+- *on_lng* (part of $\ell_c$): longitude of the courier's position at the start of the shift.
+- *on_time* ($e_c$): time stamp detailing when the courier started the shift.
+- *off_time* ($l_c$): time stamp detailing when the courier ended the shift.
+
+The *orders_instance_data* table contains information about all the orders processed during the day and is composed of the following columns:
+
+- *order_id*: and id to identify an order.
+- *pick_up_lat* (part of $\ell_r$): latitude of the order's pick-up location.
+- *pick_up_lng* (part of $\ell_r$): longitude of the order's pick-up location.
+- *drop_off_lat* (part of $\ell_u$): latitude of the order's drop-off location.
+- *drop_off_lng* (part of $\ell_u$): longitude of the order's drop-off location.
+- *placement_time* ($a_o$): time stamp detailing the order's creation time.
+- *preparation_time* ($d_o$): time stamp detailing when the order starts being prepared.
+- *ready_time* ($e_o$): time stamp detailing when the order is ready to be picked up.
+- *expected_drop_off_time* ($f_o'$): time stamp detailing when the order should be dropped off.
+
+Be aware that given the [**structural assumptions**](#structural_assumptions), a user can only place a single order per day (instance).
+Considering this, data pertaining orders can be referred to as belonging to users indiscriminately.
+In consequence, the arrival rates for users are the same as orders.
+
+To understand how for different instance sizes the arrival rate of entities varies throughout the day, Figure \@ref(fig:hours-arrivals) shows an aggregated count of the actors logging into the system per hour of the day. 
+These figures show there is a significant difference between instance sizes, where the 16 small instances are as big as the four medium instances and these 20 instances are only about half as big as the four large instances.
+The behavior of the real-life arrivals into the system showcases there are two peaks for users ordering meals: lunch and dinner.
+Couriers understand these peaks, thus the majority start logging in some hours before the demand spikes.
+
+```{r hours-arrivals, fig.cap='Aggregated entity arrivals by instance size.', fig.align='center', echo=FALSE, eval=TRUE, results='hide', message=FALSE, crop=NULL, fig.show='hold', out.width='70%', warning=FALSE}
+# Packages
+library(pacman)
+pacman::p_load(readr, dplyr, ggplot2, scales, ggrepel)
+
+# Constants
+raw_dir <- './_raw_data/'
+
+# Import data
+data <- read_csv(paste0(raw_dir, 'sizes_hour_data.csv'))
+
+# Process data
+data$size <- factor(data$size, levels = c('L', 'M', 'S'))
+
+# Plot data
+users_plot <- ggplot(data = data, mapping = aes(x = hour, fill = size, linetype = size)) +
+  geom_area(mapping = aes(y = orders), alpha = 0.4, color = 'black', size = 0.5, position = 'identity') +
+  scale_x_continuous(breaks = seq(0, 23, 1), limits = c(0, 23)) +
+  scale_y_continuous(labels = scales::comma, breaks = seq(0, 25000, 5000), limits = c(0, 25000)) +
+  theme_classic() +
+  labs(
+    title = 'Arrivals per Hour - Users',
+    subtitle = '24 instances - 6 cities',
+    x = 'Hour',
+    y = 'Users'
+  ) +
+  theme(
+    legend.position = 'bottom',
+    panel.grid.major.x = element_line(color = 'grey85'),
+    panel.grid.major.y = element_line(color = 'grey85')
+  )
+couriers_plot <- ggplot(data = data, mapping = aes(x = hour, fill = size, linetype = size)) +
+  geom_area(mapping = aes(y = couriers), alpha = 0.4, color = 'black', size = 0.5, position = 'identity') +
+  scale_x_continuous(breaks = seq(0, 23, 1), limits = c(0, 23)) +
+  scale_y_continuous(labels = scales::comma, breaks = seq(0, 8000, 2000), limits = c(0, 8000)) +
+  theme_classic() +
+  labs(
+    title = 'Arrivals per Hour - Couriers',
+    subtitle = '24 instances - 6 cities',
+    x = 'Hour',
+    y = 'Couriers'
+  ) +
+  theme(
+    legend.position = 'bottom',
+    panel.grid.major.x = element_line(color = 'grey85'),
+    panel.grid.major.y = element_line(color = 'grey85')
+  )
+
+users_plot
+couriers_plot
+```
+
+## Scenarios, Performance Metrics and Test Configurations {#scenarios_performance}
+
+36 simulation scenarios are designed to test the computational framework. 
+The complete list and description of scenarios can be found in Appendix \@ref(scenarios-description), along with the numerical values for all the variables used during the testing phase.
+Two experiments (operational configurations) are established, based on the courier's *acceptance* and *movement evaluation* policies.
+
+- Experiment A (`absolute-still`): uses the `absolute` *acceptance* policy $\mathbb{P}'_{ap}[\text{absolute}]$ and the `still` *movement evaluation* policy $\mathbb{P}_{me}'[\text{still}]$.
+These conditions are tested in @mdrp and @provably.
+- Experiment B (`uniform-neighbors`): uses the `uniform` *acceptance* policy $\mathbb{P}'_{ap}[\text{uniform}]$ and the `neighbors` *movement evaluation* policy $\mathbb{P}_{me}'[\text{neighbors}]$.
+These conditions resemble a more life-like operation.
+
+For each experiment, over the set of scenarios, the five proposed *matching* policies in Table \@ref(tab:matching-policies) are run and the framework is used to compare which policy performs the best.
+The following performance metrics are used to compare the outcomes of applying different policies in the operation:
+
+- *In store to pick-up time* (`store_pick`).
+Captures quality of assignments for the courier and system precision (just-in-time arrivals).
+- *Ready to pick-up time* (`ready_pick`).
+Captures quality of service for both the user and courier by measuring the meals' loss of freshness.
+- *Drop-off lateness time* (`lateness`).
+Captures quality of service for the user and quality of the solutions.
+- *Click to taken time* (`click_taken`).
+Captures the effects of the prepositioning policy and the acceptance in the system.
+- *Click to door time* (`click_door`).
+Captures quality of service for the user and system agility.
+- *Fulfillment*.
+Captures quality of the solutions and service for all actors involved.
+
+The results of the different simulations are saved in the DDBB in the tables *order_metrics*, *courier_metrics* and *matching_optimization_metrics*.
+
+Three computers are used to run the simulations:
+
+- $MP$: MacBook Pro, 2.3 GHz Quad-Core Intel Core i7, 16 GB 3733 MHz LPDDR4X Memory.
+- $MA$: Macbook Air, 1.8 GHz Dual-Core Intel Core i5, 8 GB 1600 MHz DDR3 Memory.
+- $IM$: iMac, 2.7 GHz Quad-Core Intel Core i5, 8 GB 1600 MHz DDR3 Memory.
+
+The LINPACK benchmark [@linpack] is used to compare the performance of the computers and calculated based on Appendix \@ref(linpack-benchmark).
+
+- $MP$ = 116.8682 GFlops $s^{-1}$
+- $MA$ = 33.9102 GFlops $s^{-1}$
+- $IM$ = 47.6564 GFlops $s^{-1}$
+
+$MP$ is the fastest computer, thus a factor is calculated using $MP$ as reference to convert computational time across tests.
+
+- $MA_F = 33.9102 / 116.8682 = 0.2902$
+- $IM_F = 47.6564 / 116.8682 = 0.4078$
+
+The `Gurobi` solver is used for testing (`COIN-OR` implementation with `pulp` is also available).
+
+## Results {#results}
+
+### An Ideal Operation
+
+Figure \@ref(fig:results-absolute-still) shows the result of experiment A (`absolute-still`) across all scenarios.
+Box plots describe the performance of the different *matching* policies, grouped by metric.
+A vertical line crosses zero for reference.
+The fulfillment rate is shown for each *matching* policy.
+
+```{r results-absolute-still, fig.cap='Performance metrics box plots comparison between matching policies for experiment A (absolute-still) across scenarios.', fig.align='center', fig.width=8, fig.height=7, echo=FALSE, eval=TRUE, results='hide', message=FALSE, crop=NULL, warning=FALSE}
+# Packages
+library(pacman)
+pacman::p_load(readr, dplyr, ggplot2, scales)
+
+# Constants
+clean_dir <- './_clean_data/'
+keyword <- 'order_metrics'
+acceptance_policy <- 'Absolute'
+movement_evaluation_policy <- 'Still'
+operation_policy <- paste0(tolower(acceptance_policy), '_', tolower(movement_evaluation_policy))
+max_value <- 5000
+min_value <- -1500
+breaks <- 500
+
+# Import data
+dropped_off_metrics <- read_csv(paste0(clean_dir, 'clean_dropped_off_', keyword, '.csv'))
+canceled_metrics <- read_csv(paste0(clean_dir, 'clean_canceled_', keyword, '.csv'))
+
+# Process data
+policy_dropped_off_metrics <- dropped_off_metrics %>% 
+  dplyr::filter(
+    operation_policies == operation_policy,
+    value >= min_value,
+    value <= max_value
+  ) %>% 
+  select(-c(operation_policies, scenario, computer))
+policy_canceled_metrics <- canceled_metrics %>% 
+  dplyr::filter(operation_policies == operation_policy) %>% 
+  select(-c(operation_policies, scenario, computer))
+
+dropped_off_stats <- policy_dropped_off_metrics %>% 
+  dplyr::filter(metric == 'click_door') %>% 
+  group_by(matching_policy) %>% 
+  summarise(dropped_off = n())
+canceled_stats <- policy_canceled_metrics %>% 
+  dplyr::filter(metric == 'click_to_cancel_time') %>% 
+  group_by(matching_policy) %>% 
+  summarise(canceled = n())
+stats <- dropped_off_stats %>% 
+  inner_join(
+    canceled_stats,
+    by = 'matching_policy'
+  ) %>% 
+  mutate(
+    fulfillment_rate = dropped_off / (dropped_off + canceled)
+  )
+
+
+# Plot data
+plot <- ggplot() +
+  geom_boxplot(
+    data = policy_dropped_off_metrics,
+    mapping = aes(x = value, y = metric, color = matching_policy)
+  ) +
+  theme_classic() +
+  theme(
+    legend.position = 'bottom',
+    panel.grid.major.x = element_line(color = 'grey85'),
+    axis.text.y = element_text(angle = 90, hjust = 0.5)
+  ) +
+  labs(
+    y = 'Metric',
+    x = 'Value [s]',
+    color = 'Matching Policy',
+    title = 'Matching Policies Main Metrics Comparison',
+    subtitle = paste0(
+      'Acceptance Policy = ', acceptance_policy, ', ', 
+      'Movement Evaluation Policy = ', movement_evaluation_policy, ', ',
+      'Scenarios = ', dropped_off_metrics %>% select(scenario) %>% distinct() %>% nrow(), ', ',
+      'Orders = ', stats[1, 2] + stats [1, 3]
+    )
+  ) +
+  guides(color = guide_legend(nrow = 1)) +
+  scale_x_continuous(
+    labels = scales::comma, 
+    breaks = seq(min_value, max_value, breaks), 
+    limits = c(min_value, max_value)
+  ) +
+  geom_vline(xintercept = 0, linetype = 'dashed') +
+  geom_label(
+    mapping = aes(
+      x = 3600,
+      y = seq(4.2, 5.2, 0.25),
+      label = paste0(stats$matching_policy, ' = ', round(stats$fulfillment_rate * 100), '%')
+    ),
+    size = 3,
+    hjust = 0,
+    fill = 'grey97'
+  ) +
+  annotate(
+    'text',
+    x = 3600,
+    y = 5.4,
+    label = 'Fulfillment Rate',
+    hjust = 0,
+    fontface = 'bold',
+    size = 3
+  )
+
+plot
+```
+
+Regarding the five time-related metrics, the optimal behavior is to stand on the reference line.
+For fulfillment, a higher percentage is desired.
+The `greedy` policy shows the worse overall time-related performance: metrics are spread and median values are higher compared to the other policies.
+This behavior is expected due to the simplistic nature of the algorithm.
+Although the `greedy` policy shows the highest fulfillment (as orders are practically guaranteed to find a match disregarding the quality), service for these orders is not optimal.
+In real-life operations, many times it is best to prematurely cancel an order than to deliver it in poor conditions.
+
+The four optimization *matching* policies show a very similar performance across time metrics.
+The `mdrp-graph` policy has a higher median for the drop-off lateness time, click to taken time and click to door time.
+It can be seen that using the prospects strategy from Definition \@ref(def:prospects) reduces outliers, as the time distribution for the drop-off lateness time, click to taken time and click to door time for policies `mdrp-graph-prospects` and `modified-mdrp` are more adjusted when compared to the `mdrp` and `mdrp-graph` policies.
+There are few outliers for the `mdrp-graph-prospects` and `modified-mdrp` policies shown in the ready to pick-up time and in-store to pick-up time, which can be discarded, thus confirming that using the prospects strategy reduces unexpected edge cases.
+
+With respect to the solver, using the network flow model from Definition \@ref(def:graph-model) does not provide an edge over the MIP model from Definition \@ref(def:integer-model) regarding the time metrics.
+In this operational configuration, the assignment updates strategy during the routing phase described in Algorithm \@ref(alg:routes) used by the `modified-mdrp` *matching* policy does not result in any observable advantage over the described metrics.
+
+The fulfillment rate is greatly affected by the use of prospects, as the `mdrp-graph-prospects` and `modified-mdrp` policies have lower fulfillment rates compared to the `mdrp-graph` policy.
+In addition, the `mdrp` policy has the lowest acceptance rate, meaning in this ideal environment, using a network flow solver may provide an advantage for the fulfillment of orders.
+
+Aggregating the performance of the different metrics, it is shown that introducing prospects in this "ideal" operation (couriers who accept all notifications and do not move about freely) improves the distribution of time-related metrics.
+The presence of assignment updates does not seem to influence the performance of the *matching* policy, given that the `mdrp-graph-prospects` and `modified-mdrp` policies have close to identical results.
+
+### A More Realistic Operation
+
+Figure \@ref(fig:results-uniform-neighbors) shows the result of experiment B (`uniform-neighbors`) across all scenarios.
+Box plots describe the performance of the different *matching* policies, grouped by metric.
+A vertical line crosses zero for reference.
+The fulfillment rate is shown for each *matching* policy.
+This operational configuration resembles a more life-like operation, where couriers are able to move freely about the city and decide if they want to accept or reject notifications.
+
+```{r results-uniform-neighbors, fig.cap='Performance metrics box plots comparison between matching policies for experiment B (uniform-neighbors) across scenarios.', fig.align='center', fig.width=8, fig.height=7, echo=FALSE, eval=TRUE, results='hide', message=FALSE, crop=NULL, warning=FALSE}
+# Packages
+library(pacman)
+pacman::p_load(readr, dplyr, ggplot2, scales)
+
+# Constants
+clean_dir <- './_clean_data/'
+keyword <- 'order_metrics'
+acceptance_policy <- 'Uniform'
+movement_evaluation_policy <- 'Neighbors'
+operation_policy <- paste0(tolower(acceptance_policy), '_', tolower(movement_evaluation_policy))
+max_value <- 5000
+min_value <- -1500
+breaks <- 500
+
+# Import data
+dropped_off_metrics <- read_csv(paste0(clean_dir, 'clean_dropped_off_', keyword, '.csv'))
+canceled_metrics <- read_csv(paste0(clean_dir, 'clean_canceled_', keyword, '.csv'))
+
+# Process data
+policy_dropped_off_metrics <- dropped_off_metrics %>% 
+  dplyr::filter(
+    operation_policies == operation_policy,
+    value >= min_value,
+    value <= max_value
+  ) %>% 
+  select(-c(operation_policies, scenario, computer))
+policy_canceled_metrics <- canceled_metrics %>% 
+  dplyr::filter(operation_policies == operation_policy) %>% 
+  select(-c(operation_policies, scenario, computer))
+
+dropped_off_stats <- policy_dropped_off_metrics %>% 
+  dplyr::filter(metric == 'click_door') %>% 
+  group_by(matching_policy) %>% 
+  summarise(dropped_off = n())
+canceled_stats <- policy_canceled_metrics %>% 
+  dplyr::filter(metric == 'click_to_cancel_time') %>% 
+  group_by(matching_policy) %>% 
+  summarise(canceled = n())
+stats <- dropped_off_stats %>% 
+  inner_join(
+    canceled_stats,
+    by = 'matching_policy'
+  ) %>% 
+  mutate(
+    fulfillment_rate = dropped_off / (dropped_off + canceled)
+  )
+
+
+# Plot data
+plot <- ggplot() +
+  geom_boxplot(
+    data = policy_dropped_off_metrics,
+    mapping = aes(x = value, y = metric, color = matching_policy)
+  ) +
+  theme_classic() +
+  theme(
+    legend.position = 'bottom',
+    panel.grid.major.x = element_line(color = 'grey85'),
+    axis.text.y = element_text(angle = 90, hjust = 0.5)
+  ) +
+  labs(
+    y = 'Metric',
+    x = 'Value [s]',
+    color = 'Matching Policy',
+    title = 'Matching Policies Main Metrics Comparison',
+    subtitle = paste0(
+      'Acceptance Policy = ', acceptance_policy, ', ', 
+      'Movement Evaluation Policy = ', movement_evaluation_policy, ', ',
+      'Scenarios = ', dropped_off_metrics %>% select(scenario) %>% distinct() %>% nrow(), ', ',
+      'Orders = ', stats[1, 2] + stats [1, 3]
+    )
+  ) +
+  guides(color = guide_legend(nrow = 1)) +
+  scale_x_continuous(
+    labels = scales::comma, 
+    breaks = seq(min_value, max_value, breaks), 
+    limits = c(min_value, max_value)
+  ) +
+  geom_vline(xintercept = 0, linetype = 'dashed') +
+  geom_label(
+    mapping = aes(
+      x = 3600,
+      y = seq(4.2, 5.2, 0.25),
+      label = paste0(stats$matching_policy, ' = ', round(stats$fulfillment_rate * 100), '%')
+    ),
+    size = 3,
+    hjust = 0,
+    fill = 'grey97'
+  ) +
+  annotate(
+    'text',
+    x = 3600,
+    y = 5.4,
+    label = 'Fulfillment Rate',
+    hjust = 0,
+    fontface = 'bold',
+    size = 3
+  )
+
+plot
+```
+
+In a realistic setting, the `greedy` policy still achieves the best fulfillment.
+Moreover, it still performs the worst regarding all time metrics.
+At a glance, the other *matching* policies have similar medians, minima, maxima and inter-quartile ranges.
+A clear difference regarding Figure \@ref(fig:results-absolute-still) is that in this operational condition, the `mdrp-graph` *matching* policy no longer under-performs compared to the other optimization policies.
+Once again, embedding the prospects strategy provides more predictable distributions with fewer outliers across metrics.
+The prospects strategy provides a better fulfillment rate, as it is evidenced by the 32% and 33% fulfillment of the `modified-mdrp` and `mdrp-graph-prospects` policies respectively.
+The `mdrp` policy is around 10 points worst, meaning the use of an MIP model hinders the solution space search.
+
+Using a more intelligent model to execute matching and routing can improve delivery times by 7 minutes overall, as seen by the median difference in the click to door time between the optimization policies and the `greedy` *matching* policy.
+Although it falls short for the time metrics, this situation resembles how a company must make the decision of which model to use, given they optimize different metrics, leading to an important business question: what is more important? Delivering _more_ orders or delivering _better_ orders?
+Companies reluctant to invest in research should always keep in mind that better models can provide an edge on the competition.
+These results evidence that using the proposed framework can provide useful insights and support the decision process of the operations research involved in meal delivery.
+
+The fulfillment rates shown in both experiments are very low given the definition of the `random` user and `fixed` dispatcher *cancellation* policies from Definitions \@ref(def:user-cancellation-policy) and \@ref(def:dispatcher-cancellation-policy) respectively.
+In these definitions, after a fixed time has passed from the preparation time, the decision is made to cancel an order.
+Orders with long preparation times are affected since an order can be in the preparation process and be canceled.
+An improvement to these definitions may be to set the time at some moment _before_ the ready time.
+A more robust modification is to probe possible matches before the order is notified to the restaurant, thus avoiding food waste if no courier will be available to match with the order.
+
+### Inspection Across Scenarios
+
+After analyzing the performance of the five *matching* policies across 36 scenarios under two operational configurations, a further inspection of the `mdrp` policy for Experiment B (`uniform-neighbors`) is conducted to more precisely understand how this policy varies its behavior under different conditions of the demand and fleet availability in a more realistic setting, given it shows the inferior fulfillment rate.
+Figures \@ref(fig:mdrp-scenarios-1) and \@ref(fig:mdrp-scenarios-2) show how the `mdrp` policy performs across the scenarios described in Appendix \@ref(scenarios-description) under Experiment B.
+A vertical line crosses zero for reference.
+
+```{r mdrp-scenarios-1, fig.cap='Performance metrics box plots for the uniform-neighbors experiment (B) and mdrp matching policy. Comparison across scenarios. Metrics: click to door time, click to taken time, drop-off lateness time.', fig.align='center', fig.width=8, fig.height=9, echo=FALSE, eval=TRUE, results='hide', message=FALSE, crop=NULL, warning=FALSE, fig.show='hold'}
+# Packages
+library(pacman)
+pacman::p_load(readr, dplyr, ggplot2, scales)
+
+# Constants
+clean_dir <- './_clean_data/'
+keyword <- 'order_metrics'
+acceptance_policy <- 'Uniform'
+movement_evaluation_policy <- 'Neighbors'
+policy <- 'mdrp'
+operation_policy <- paste0(tolower(acceptance_policy), '_', tolower(movement_evaluation_policy))
+max_value <- 3000
+min_value <- -1500
+breaks <- 1000
+
+# Import data
+dropped_off_metrics <- read_csv(paste0(clean_dir, 'clean_dropped_off_', keyword, '.csv'))
+canceled_metrics <- read_csv(paste0(clean_dir, 'clean_canceled_', keyword, '.csv'))
+
+# Process data
+policy_dropped_off_metrics <- dropped_off_metrics %>% 
+  dplyr::filter(
+    operation_policies == operation_policy,
+    value >= min_value,
+    value <= max_value,
+    matching_policy == policy
+  ) %>% 
+  mutate(
+    metric = factor(metric),
+    scenario = factor(scenario)
+  ) %>% 
+  select(-c(operation_policies, computer, matching_policy))
+policy_canceled_metrics <- canceled_metrics %>% 
+  dplyr::filter(
+    operation_policies == operation_policy,
+    matching_policy == policy
+  ) %>% 
+  mutate(
+    metric = factor(metric),
+    scenario = factor(scenario)
+  ) %>% 
+  select(-c(operation_policies, computer, matching_policy))
+
+dropped_off_stats <- policy_dropped_off_metrics %>% 
+  dplyr::filter(metric == 'click_door') %>% 
+  group_by(scenario) %>% 
+  summarise(dropped_off = n())
+canceled_stats <- policy_canceled_metrics %>% 
+  dplyr::filter(metric == 'click_to_cancel_time') %>% 
+  group_by(scenario) %>% 
+  summarise(canceled = n())
+stats <- dropped_off_stats %>% 
+  inner_join(
+    canceled_stats,
+    by = 'scenario'
+  ) %>% 
+  mutate(
+    fulfillment_rate = dropped_off / (dropped_off + canceled)
+  )
+
+
+# Plot data
+plot_1 <- ggplot() +
+  geom_boxplot(
+    data = policy_dropped_off_metrics %>% 
+      dplyr::filter(
+        metric %in% c('lateness', 'click_take', 'click_door')
+      ),
+    mapping = aes(x = value, y = scenario)
+  ) +
+  facet_grid(cols = vars(metric)) +
+  theme_classic() +
+  theme(
+    legend.position = 'bottom',
+    panel.grid.major.x = element_line(color = 'grey85'),
+    axis.text.y = element_text(angle = 90, hjust = 0.5),
+    strip.background = element_rect(
+      color='black', fill='grey85', size=1, linetype='solid'
+    ),
+    strip.text = element_text(
+      size = 12
+    )
+  ) +
+  labs(
+    y = 'Scenario',
+    x = 'Value [s]',
+    title = 'Scenarios Performance Metrics Comparison',
+    subtitle = paste0(
+      'Acceptance Policy = ', acceptance_policy, ', ', 
+      'Movement Evaluation Policy = ', movement_evaluation_policy, ', ',
+      'Matching Policy = ', policy, ', \n',
+      'Orders = ', sum(stats$dropped_off) + sum(stats$canceled)
+    )
+  ) +
+  guides(color = guide_legend(nrow = 1)) +
+  scale_x_continuous(
+    labels = scales::comma, 
+    breaks = seq(min_value, max_value, breaks), 
+    limits = c(min_value, max_value)
+  ) +
+  geom_vline(xintercept = 0, linetype = 'dashed')
+
+plot_1
+```
+
+```{r mdrp-scenarios-2, fig.cap='Performance metrics box plots for the uniform-neighbors experiment (B) and mdrp matching policy. Comparison across scenarios. Metrics: ready to pick-up time, in-store to pick-up time.', fig.align='center', fig.width=8, fig.height=9, echo=FALSE, eval=TRUE, results='hide', message=FALSE, crop=NULL, warning=FALSE, fig.show='hold'}
+# Packages
+library(pacman)
+pacman::p_load(readr, dplyr, ggplot2, scales)
+
+# Constants
+clean_dir <- './_clean_data/'
+keyword <- 'order_metrics'
+acceptance_policy <- 'Uniform'
+movement_evaluation_policy <- 'Neighbors'
+policy <- 'mdrp'
+operation_policy <- paste0(tolower(acceptance_policy), '_', tolower(movement_evaluation_policy))
+max_value <- 3000
+min_value <- -1500
+breaks <- 1000
+
+# Import data
+dropped_off_metrics <- read_csv(paste0(clean_dir, 'clean_dropped_off_', keyword, '.csv'))
+canceled_metrics <- read_csv(paste0(clean_dir, 'clean_canceled_', keyword, '.csv'))
+
+# Process data
+policy_dropped_off_metrics <- dropped_off_metrics %>% 
+  dplyr::filter(
+    operation_policies == operation_policy,
+    value >= min_value,
+    value <= max_value,
+    matching_policy == policy
+  ) %>% 
+  mutate(
+    metric = factor(metric),
+    scenario = factor(scenario)
+  ) %>% 
+  select(-c(operation_policies, computer, matching_policy))
+policy_canceled_metrics <- canceled_metrics %>% 
+  dplyr::filter(
+    operation_policies == operation_policy,
+    matching_policy == policy
+  ) %>% 
+  mutate(
+    metric = factor(metric),
+    scenario = factor(scenario)
+  ) %>% 
+  select(-c(operation_policies, computer, matching_policy))
+
+dropped_off_stats <- policy_dropped_off_metrics %>% 
+  dplyr::filter(metric == 'click_door') %>% 
+  group_by(scenario) %>% 
+  summarise(dropped_off = n())
+canceled_stats <- policy_canceled_metrics %>% 
+  dplyr::filter(metric == 'click_to_cancel_time') %>% 
+  group_by(scenario) %>% 
+  summarise(canceled = n())
+stats <- dropped_off_stats %>% 
+  inner_join(
+    canceled_stats,
+    by = 'scenario'
+  ) %>% 
+  mutate(
+    fulfillment_rate = dropped_off / (dropped_off + canceled)
+  )
+
+
+# Plot data
+plot_2 <- ggplot() +
+  geom_boxplot(
+    data = policy_dropped_off_metrics %>% 
+      dplyr::filter(
+        metric %in% c('store_pick', 'ready_pick')
+      ),
+    mapping = aes(x = value, y = scenario)
+  ) +
+  facet_grid(cols = vars(metric)) +
+  theme_classic() +
+  theme(
+    legend.position = 'bottom',
+    panel.grid.major.x = element_line(color = 'grey85'),
+    axis.text.y = element_text(angle = 90, hjust = 0.5),
+    strip.background = element_rect(
+      color='black', fill='grey85', size=1, linetype='solid'
+    ),
+    strip.text = element_text(
+      size = 12
+    )
+  ) +
+  labs(
+    y = 'Scenario',
+    x = 'Value [s]',
+    title = 'Scenarios Performance Metrics Comparison',
+    subtitle = paste0(
+      'Acceptance Policy = ', acceptance_policy, ', ', 
+      'Movement Evaluation Policy = ', movement_evaluation_policy, ', ',
+      'Matching Policy = ', policy, ', \n',
+      'Orders = ', sum(stats$dropped_off) + sum(stats$canceled)
+    )
+  ) +
+  guides(color = guide_legend(nrow = 1)) +
+  scale_x_continuous(
+    labels = scales::comma, 
+    breaks = seq(0, 1000, 200), 
+    limits = c(0, 1000)
+  ) +
+  geom_vline(xintercept = 0, linetype = 'dashed')
+
+plot_2
+```
+
+The `mdrp` *matching* policy performs consistently for scenarios 13 - 31, as seen in the click to door time.
+The inter-quartile ranges oscillate around 1500 to 2500 seconds for these scenarios, with small variations in the median and no outliers.
+These scenarios contain small and medium instances with varied fleet conditions.
+The behavior is less consistent for scenarios 1 - 12, corresponding to the large instances with a limited fleet.
+Although the inter-quartile ranges oscillate between the same range, the median has a higher variability.
+Outliers are present for scenarios 1 - 12, meaning city-specific conditions should be examined.
+The worst click to door time is observed for scenarios 33 - 36, belonging to medium instances over a demand peak with a limited fleet.
+For this stringent conditions, the *matching* policy causes higher delivery times over an adjusted variability, surpassing the 41 minute mark (2500 seconds).
+For a meal delivery operation, having consistent deliveries over 40 minutes is not a desired behavior.
+
+The click to taken time behaves similarly to the click to door time: consistent results for scenarios 13 - 31, increased times for scenarios 33 - 36 and unpredictable distributions for scenarios 1 - 12.
+The higher click to taken time for scenarios 33 - 36 suggests problems with the fleet distribution, as it takes longer for an order to be assigned, due to either lack of couriers or a high rejection rate.
+
+The drop-off lateness performance of the `mdrp` *matching* policy is adequate in scenarios 13 - 31, since the distribution contains the reference, hinting at an on-time operation.
+For some deliveries, arriving before the expected drop-off time is ideal, although this must be handled with care as some customers have reservations over their meals arriving before the expected time, since they may not be at the delivery address yet.
+Given that for scenarios 33 - 36 the click to taken time is higher, it is shown in the drop-off lateness time, given that more deliveries are fulfilled after the expected drop-off time.
+The `mdrp` policy's performance is sub-optimal for the large instances, as there is uncertainty evidenced for the drop-off lateness metric for scenarios 1 - 12.
+
+The ready to pick-up time is consistent across scenarios, with a median around 300 seconds for most of them.
+Most scenarios show maximum values slightly above the 10-minute mark, which is the limit for an expected loss of freshness.
+However, around 25% of the orders evidence a ready to pick-up time of around 200 seconds which is a positive outcome.
+
+The in-store to pick-up time describes the quality of the matches for the couriers.
+It can be seen that for scenarios 33 - 36 there are smaller medians when compared to scenarios 13 - 31, meaning that the couriers spend less time at the restaurant.
+Contrasting against the click to taken time leads to the conclusion that the `mdrp` policy causes late arrivals to the restaurant, affecting the freshness of the meals but benefiting the couriers.
+This shows the real-life situation in which stakeholders have conflictive interests.
+
+\newpage
+
+### Computational Efficiency
+
+To understand how the *matching* policies compare regarding computational efficiency, Figure \@ref(fig:computational-results) compares them by computational time box plots, differentiating algorithms (matching and routing).
+
+```{r computational-results, fig.cap='Computational time box plots comparison between matching policies. Algorithm times shown: matching and routing.', fig.align='center', fig.width=8, fig.height=7, echo=FALSE, eval=TRUE, results='hide', message=FALSE, crop=NULL, warning=FALSE}
+# Packages
+library(pacman)
+pacman::p_load(readr, dplyr, ggplot2, scales)
+
+# Constants
+clean_dir <- './_clean_data/'
+keyword <- 'matching_optimization_metrics'
+max_value <- 100
+min_value <- 0
+breaks <- 10
+imac_factor <- 0.4078
+macbook_air_factor <- 0.2902
+
+# Import data
+metrics <- read_csv(paste0(clean_dir, 'clean_', keyword, '.csv'))
+
+# Process data
+policy_metrics <- metrics %>% 
+  dplyr::filter(metric %in% c('matching_time', 'routing_time')) %>% 
+  mutate(
+    computer = factor(computer),
+    metric = factor(metric),
+    value = case_when(
+      computer == 'imac' ~ value * imac_factor,
+      computer == 'macbook_air' ~ value * macbook_air_factor,
+      TRUE ~ value
+    )
+  ) %>% 
+  select(-c(operation_policies, scenario, computer))
+levels(policy_metrics$metric) <- c('Matching Time', 'Routing Time')
+
+
+# Plot data
+plot <- ggplot() +
+  geom_boxplot(
+    data = policy_metrics,
+    mapping = aes(x = value, y = metric, color = matching_policy)
+  ) +
+  # facet_grid(rows = vars(metric)) +
+  theme_classic() +
+  theme(
+    legend.position = 'bottom',
+    panel.grid.major.x = element_line(color = 'grey85'),
+    axis.text.y = element_text(angle = 90, hjust = 0.5, size = 10)
+  ) +
+  labs(
+    y = 'Metric',
+    x = 'Time [s]',
+    color = 'Matching Policy',
+    title = 'Matching Policies Computational Time Comparison',
+    subtitle = paste0(
+      'Scenarios = ', metrics %>% select(scenario) %>% distinct() %>% nrow(), ', ',
+      'Experiments = [A, B], ',
+      'Optimization Runs = ', policy_metrics %>% dplyr::filter(matching_policy == 'modified_mdrp', metric == 'Matching Time') %>% nrow()
+    )
+  ) +
+  guides(color = guide_legend(nrow = 1)) +
+  scale_x_continuous(
+    labels = scales::comma, 
+    breaks = seq(min_value, max_value, breaks), 
+    limits = c(min_value, max_value)
+  )
+
+plot
+```
+
+The `greedy` *matching* policy converts every order into a single route and does not register routing times.
+The `mdrp`, `mdrp-graph` and `mdrp-graph-prospects` *matching* policies evidence similar routing time performance as a consequence of using Algorithm \@ref(alg:routes) without assignment updates.
+The `modified-mdrp` *matching* policy has a slightly higher median, hinting at assignment updates affecting routing efficiency caused by the additional computations.
+The distributions of the four optimization *matching* policies are alike, all showing a high quantity of outliers.
+
+The `greedy` *matching* policy shows the best matching computational performance due to its simple logic.
+In contrast, the median for the matching time in the other *matching* policies is three to four times higher.
+The `mdrp-graph` *matching* policy shows the best computational performance with the most adjusted distribution and lower values, with the `mdrp` policy close behind.
+This shows that implementing the network flow model from Definition \@ref(def:graph-model) (used in the `mdrp-graph`, `mdrp-graph-prospects` and `modified-mdrp`) is not decisive when compared to the MIP model from Definition \@ref(def:integer-model), corresponding to the `mdrp` policy.
+
+The prospects strategy described in Definition \@ref(def:prospects) is conceived to reduce the solution space of the matching problem and gain computational efficiency, however, it is shown that the overhead of calculating the prospects negatively impacts the overall matching time and is not advantageous in this regard, evidencing slower times for the `modified-mdrp` policy.
+The computational times for the routing and matching algorithms are very high when compared to expected results from a production-ready model, which is typically expected to compute problems of similar magnitude in few seconds (milliseconds when possible).
+From a research perspective comparing *matching* policies is beneficial, however alternative policies should be considered for a production solution, aiming at using modern distributed and scalable cloud computing.
+In many production *matching* policies, some sort of problem partitioning strategy is used, such as clustering, to solve smaller models in parallel.
+
+The optimization-based *matching* policies use different strategies for variable creation and embed distinct models.
+To compare these four policies, Figure \@ref(fig:solution-space) depicts the solution spaces, with respect to variables and constraints, for optimization runs across scenarios and experiments (A and B).
+
+```{r solution-space, fig.cap='Solution space comparison between optimization matching policies, across scenarios and experiments.', fig.align='center', fig.width=8, fig.height=7, echo=FALSE, eval=TRUE, results='hide', message=FALSE, crop=NULL, warning=FALSE}
+# Packages
+library(pacman)
+pacman::p_load(readr, dplyr, ggplot2, scales)
+
+# Constants
+clean_dir <- './_clean_data/'
+keyword <- 'matching_optimization_metrics'
+custom_colors <- c(
+  'greedy' = '#F8766D', 
+  'mdrp' = '#A3A500', 
+  'mdrp_graph' = '#00BF7D', 
+  'mdrp_graph_prospects' = '#00B0F6', 
+  'modified_mdrp' = '#E76BF3'
+)
+max_value_x <- 10000
+min_value_x <- 0
+breaks_x <- 1000
+max_value_y <- 400
+min_value_y <- 0
+breaks_y <- 100
+
+# Import data
+metrics <- read_csv(paste0(clean_dir, 'clean_wide_', keyword, '.csv'))
+
+# Process data
+policy_metrics <- metrics %>% 
+  dplyr::filter(matching_policy != 'greedy') %>% 
+  mutate(matching_policy = factor(matching_policy)) %>% 
+  select(-c(operation_policies, scenario))
+
+# Plot data
+plot <- ggplot() +
+  geom_point(
+    data = policy_metrics,
+    mapping = aes(x = variables, y = constraints, color = matching_policy)
+  ) +
+  facet_grid(rows = vars(matching_policy)) +
+  scale_color_manual(values = custom_colors) +
+  theme_classic() +
+  theme(
+    legend.position = 'bottom',
+    panel.grid.major.x = element_line(color = 'grey85'),
+    panel.grid.major.y = element_line(color = 'grey85'),
+    strip.background = element_rect(
+      color='black', fill='grey85', size=1, linetype='solid'
+    ),
+    strip.text = element_text(
+      size = 8
+    )
+  ) +
+  labs(
+    y = 'Constraints',
+    x = 'Decision Variables',
+    color = 'Matching Policy',
+    title = 'Matching Policies Solution Space Comparison',
+    subtitle = paste0(
+      'Scenarios = ', metrics %>% select(scenario) %>% distinct() %>% nrow(), ', ',
+      'Experiments = [A, B], ',
+      'Optimization Runs = ', metrics %>% dplyr::filter(matching_policy == 'modified_mdrp') %>% nrow()
+    )
+  ) +
+  guides(color = guide_legend(nrow = 1)) +
+  scale_x_continuous(
+    labels = scales::comma, 
+    breaks = seq(min_value_x, max_value_x, breaks_x), 
+    limits = c(min_value_x, max_value_x)
+  ) +
+  scale_y_continuous(
+    labels = scales::comma, 
+    breaks = seq(min_value_y, max_value_y, breaks_y), 
+    limits = c(min_value_y, max_value_y)
+  )
+
+plot
+```
+
+The prospects strategy limits the creation of decision variables which directly results in fewer constraints.
+As seen from Figure \@ref(fig:computational-results), the `mdrp` and `mdrp-graph` policies show the best computational time, meaning that removing low quality bases with the prospects strategy does not lead to a better search of the solution space.
+The pre-solve stage of the solver takes care of removing sub-optimal solutions in the `mdrp` and `mdrp-graph` policies.
+In this research, the prospects strategy does not evidence an advantage from the computational efficiency perspective.
+If the problem turns prohibitively large, the prospects strategy may result beneficial.
+Additional runs should be performed with the `COIN-OR` engine to compare results among solvers.

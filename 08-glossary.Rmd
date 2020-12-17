@@ -1,0 +1,186 @@
+---
+title: "07-glossary"
+output: pdf_document
+---
+
+# (APPENDIX) Appendix {-}
+
+\twocolumn
+
+# Glossary
+
+$a_o$: placement time of the order $o \in O$
+
+$\beta$: maximum allowed total off-set from the stops' expected time
+
+$b_{\ell_1, \ell_2}$: travel time between locations $\ell_1$ and $\ell_2$
+
+$C$: set of couriers
+
+$c$: a courier $c \in C$
+
+$c_n$: the courier $c \in C$ associated to notification $n \in n$
+
+$c_o$: the courier $c \in C$ assigned to order $o \in O$
+
+$C_r$: set of couriers available at restaurant $r \in R$
+
+$C_t$: idle and picking-up couriers at time $t \in T$
+
+$d$: maximum linear distance between a courier and a restaurant
+
+$d_o$: preparation time of order $o \in O$
+
+$\delta_{o, c}^s$: drop-off time of order $o \in O$ in route $s \in S$ if assigned to courier $c \in C$
+
+$\Delta_1$: maximum time after an order has been ready
+
+$e_c$: on-time of courier $c \in C$
+
+$e_o$: ready time of the order $o \in O$
+
+$f$: buffering time for sending pick-up & drop-off notifications
+
+$f_o$: actual drop-off time for order $o \in O$
+
+$f_o'$: expected drop-off time for order $o \in O$
+
+$f_p$: time fraction for sending prepositioning notifications
+
+$f_r$:time fraction for courier relocation
+
+$g_{c, s}$: assignment cost if courier $c \in C$ where to be matched to route $s \in S$
+
+$h_{\ell_1, \ell_2}$: haversine distance between locations $\ell_1$ and $\ell_2$
+
+$I$: set of inputs for a policy
+
+$i_s$: insertion position at route $s \in S$
+
+$l_c$: off-time of courier $c \in C$
+
+$\ell'$: location of a city intersection
+
+$\ell_c$: on-location of courier $c \in C$
+
+$\ell_{c, t}$: location of courier $c \in C$ at time $t \in T$
+
+$\ell_n$: location of notification $n \in N_t$
+
+$\ell_r$: pick-up location for restaurant $r \in R$
+
+$\ell_u$: drop-off location of user $u \in U$
+
+$m_c$: number of orders delivered during courier's $c \in C$ shift
+
+$MDRP$: Meal Delivery Routing Problem
+
+$m_r$: number of routes at restaurant $r \in R$
+
+$N_t$: set of notifications at time $t \in T$
+
+$n$: a notification $n \in N_t$
+
+$n_p$: a prepositioning notification $n_p \in N_t$
+
+$n_{pd}$: a pick-up & drop-off notification $n_{pd} \in N_t$
+
+$O$: set of orders
+
+$o$: an order $o \in O$
+
+$O_t$: unassigned orders at time $t \in T$
+
+$\mathbb{P}$: a policy
+
+$\mathbb{P}'$[`...`]: a particular policy
+
+$P'$: output of a policy
+
+$p_1$: fixed compensation per order delivered
+
+$p_2$: fixed compensation rate per hour
+
+$P_c$: acceptance probability of courier $c \in C$
+
+$p_c$: acceptance rate of courier $c \in C$
+
+$\pi_{s, c}$: pick-up time of route $s \in S$ if assigned to courier $c \in C$
+
+$\mathbb{P}_{ap}$: courier acceptance policy
+
+$\mathbb{P}_{b}$: dispatcher buffering policy
+
+$\mathbb{P}_{dc}$: dispatcher cancellation policy
+
+$\mathbb{P}_{dp}$: dispatcher prepositioning policy
+
+$\mathbb{P}_{m}$: dispatcher matching policy
+
+$\mathbb{P}_{me}$: courier movement evaluation policy
+
+$\mathbb{P}_{mp}$: courier movement policy
+
+$\mathbb{P}_{pe}$: dispatcher prepositioning evaluation policy
+
+$\mathbb{P}_{uc}$: user cancellation policy
+
+$R$: set of restaurants
+
+$r$: a restaurant $r \in R$ 
+
+$r_o$: restaurant of the order $o \in O$
+
+$S$: set of routes
+
+$s$: a route $s \in S$
+
+$s_c$: the current route $s \in S$ of courier $c \in C$
+
+$S_{max}$: maximum number of orders per route
+
+$s_n$: the route $s \in S$ associated to notification $n \in n$
+
+$S_r$: set of routes for restaurant $r \in R$
+
+$s^r$: pick-up service time at restaurant $r \in R$
+
+$S_t$: set of routes calculated at time $t \in T$
+
+$s^u$: drop-off service time at user $u \in U$
+
+$T$: time horizon
+
+$t$: moment in the time horizon $t \in T$
+
+$\tau$: system target drop-off time
+
+$t^d$: cancellation time for the dispatcher
+
+$\theta$: penalty for a delayed drop-off
+
+$t^u$: cancellation time for user $u \in U$
+
+$U$: set of users
+
+$u$: a user $u \in U$
+
+$u_o$: user of the order $o \in O$
+
+$V$: set of vehicles
+
+$v$: a vehicle $v \in V$
+
+$v_c$: vehicle $v \in V$ of courier $c \in C$
+
+$\varnothing$: empty set
+
+$X$: a random variable
+
+$x_{c, s}$: variable in assignment models
+
+$x_u$: cancellation probability of user $u \in U$
+
+$Z_t$: target route size at time $t \in T$
+
+\onecolumn
